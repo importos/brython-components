@@ -4,7 +4,20 @@ author: Jeyson Molina <jeyson.mco@gmail.com>
 """
 
 ELEMENT, TEXT = 1, 3
-DOMEVENTS = ('onclick',)
+DOMEVENTS = ('onclick',	
+'oncontextmenu'	,
+'ondblclick',
+'onmousedown',
+'onmouseenter',	
+'onmouseleave',
+'onmousemove',	
+'onmouseover',	
+'onmouseout',	
+'onmouseup',	
+'onkeydown',	
+'onkeypress',	
+'onkeyup',)
+
 VAR = 'DYNODE'
 HTML_TAGS = ['A', 'ABBR', 'ACRONYM', 'ADDRESS', 'APPLET', 'AREA', 'B', 'BASE',
              'BASEFONT', 'BDO', 'BIG', 'BLOCKQUOTE', 'BODY', 'BR', 'BUTTON',
