@@ -1,0 +1,62 @@
+<html>
+
+        <head>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.10.0/codemirror.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.10.0/codemirror.css">
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.10.0/mode/python/python.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.10.0/mode/xml/xml.js"></script>
+
+            <script type="text/javascript" src="base64.js"></script>
+            <script type="text/javascript" src="/src/brython.js"></script>
+            <style>
+            body {background-color: #e2e2e2; color: #333;}
+            
+            componenteditor button{
+                line-height: 30px;
+                width: 200px;
+                display: inline-block;
+                margin: auto;
+                margin-top: 20px;
+                margin-bottom: 20px;
+                font-size: 30px;
+                cursor: pointer;
+            }
+            componenteditor input{
+                line-height:30px;
+                width: 100%;
+            }
+            componenteditor >div {
+                width: 45%;
+                margin-left: 10px;
+                float: left;
+            }
+            CodeMirror, ResultComponent {
+                display: block;
+                background-color:  #444;;
+                padding: 10px;
+            }
+            .codemirror {min-height: 300px;}
+            ResultComponent iframe{
+                background-color: #fff;
+                width: 100%;
+                min-height: 700px;
+            }
+            </style>
+        </head>
+
+    <body onload="brython();">
+
+        <script type="text/python">
+        from browser import document, alert, window, html
+        from components import init
+        from editor import CodeMirror
+
+        init()
+        </script>
+
+        <h1>Component Editor</h1>
+        <ComponentEditor></ComponentEditor>
+        </script>
+    </body>
+
+    </html>
