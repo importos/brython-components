@@ -50,6 +50,7 @@ Clone repository in brython/www/brython-components, run Brython server and acces
 
 ##Immediate TODO
 - Code refactoring for better speed and memory usage.
+- Proper Testing suite.
 - Documentation improvement.
 - Scoped styles (CSS).
 - Reported critical issues.
