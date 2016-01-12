@@ -45,8 +45,9 @@ Clone repository in brython/www/brython-components, run Brython server and acces
 - Not ready for production yet.
 - It's slow. Code refactoring is needed.
 - It's leaking memory. Needs code refactoring to exterminate leaks.
-- No scoped styles yet.
 - Needs better documentation and more examples.
+- No scoped styles yet.
+- There's not an easy way to create and maintain a list of Components yet.
 
 ##Immediate TODO
 - Code refactoring for better speed and memory usage.
