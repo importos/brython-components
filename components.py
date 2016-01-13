@@ -199,12 +199,11 @@ class Component(object):
             for attr in self.elem.attributes:
                 try:
                     name, value = attr.name, attr.value
-                    print("name", name, "value", value)
-                    if name not in ['cid']:
+                    if name not in ['cid', 'rd']:
                         setattr(self, name,eval(value))
                 except:
                     pass
-        # mark as rendered
+        # mark as mounted
         attr_rd = window.document.createAttribute("rd")
         attr_rd.value = '1'
         self.elem.setAttributeNode(attr_rd)
@@ -320,7 +319,7 @@ class Component(object):
         #c.elem = dom_elem
         return c
 
-    def _create_domelem(self, tag, text):
+    def _create_domelem(self, tag, text=''):
         if tag == 'text':
             dom = document.createTextNode(text)
             dom_elem = window.__BRYTHON__.DOMNode(dom)
@@ -350,24 +349,31 @@ class Component(object):
         pprint(("html element", value))
 
     def on_is_mounted(self, value, instance):
+        self.on_mount(self)
+    
+    def on_mount(self):
         pass
 
-    def render(self):
+    def render(self, before=None, after=None):
         """Adds self.elem to parent.elem. It's finally rendered on site when parent.elem is added to a DOMNode that is already on site"""
-        for c in self.children:
-            c.render()
-        self.parent.elem <= self.elem
+        if before is not None:
+            self.parent.elem.insertBefore(self.elem, before.elem)
+        elif after is not None:
+            self.parent.elem.insertAfter(self.elem, after.elem)
+        else:
+            self.parent.elem <= self.elem
 
-    def add(self, comp):
+    def add(self, comp, before=None, after=None):
         """Adds child component"""
         self.children.append(comp)
         comp.parent = self
         # Sometimes comps are not mounted, we should mount them before render
         if not comp.is_mounted:
             comp.root = self.root
-            print("ROOT is", self.root)
             comp.mount()
-        comp.render()
+
+
+        comp.render(before, after)
 
     def _add_cid(self, comp, cid):
         if cid is not None:
@@ -389,7 +395,7 @@ class Component(object):
         if comp_k is not None:
             del self.ids[comp_k]
         # unmount component
-        component.umount()
+        component.unmount()
 
     def remove_all(self):
         for c in self.children:
@@ -397,13 +403,12 @@ class Component(object):
         self.children = []
         self.ids = {}
 
-    def umount(self):
+    def unmount(self):
         self.parent.elem.removeChild(self.elem)
         del self.elem
 
     def add_html(self, html):
         """Simplifies adding HTML elements to a component"""
-        print("Adding", html)
         tp = TemplateProcessor()
         instructions = tp.parse("<HTMLComp>%s</HTMLComp>" % (html))
         old_instructions = self.instructions
@@ -442,10 +447,11 @@ class Component(object):
 
 class HTMLComp(Component):
     """Component for normal HTML nodes (<a>, <b>, <div>, <p>, etc.)"""
+    value = Property('')
 
     def __init__(self, tag, domnode=None):
-        super(HTMLComp, self).__init__(domnode)
         self.tag = tag
+        super(HTMLComp, self).__init__(domnode)
 
     def on_html(self, value, instance):
         self.elem.innerHTML = value
@@ -492,7 +498,7 @@ def match_search(text, regex):
     jstext = JSConstructor(window.String)(text)
     return jstext.search(regex)
 
-CONSOLE_ENABLED = True
+CONSOLE_ENABLED = False
 
 
 def pprint(*args, **kwargs):
@@ -528,6 +534,7 @@ class Register(object):
     def get_component_class(cls, cls_name):
         cls_ = None
         for comp_cls in Register.reg:
+            print(comp_cls.__name__)
             if comp_cls.__name__.upper() == cls_name:
                 cls_ = comp_cls
                 break
