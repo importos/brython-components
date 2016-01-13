@@ -54,7 +54,9 @@ class ComponentEditor(Component):
         python_editor = self.get('e1')
         html_editor = self.get('e2')
 
-        data = "['''%s''', '%s']"%(python_editor.get_code(), html_editor.get_code())
+        data = "['''%s''', '''%s''']"%(python_editor.get_code(), html_editor.get_code())
+        print("DATA", data)
+
         encoded_code = window.Base64.encode(data)
         try:
             url = window.location.href.split('#')[0]
