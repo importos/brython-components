@@ -201,7 +201,7 @@ class Component(object):
                     name, value = attr.name, attr.value
                     print("name", name, "value", value)
                     if name not in ['cid']:
-                        setattr(self, name, value)
+                        setattr(self, name,eval(value))
                 except:
                     pass
         # mark as rendered
@@ -389,10 +389,21 @@ class Component(object):
         if comp_k is not None:
             del self.ids[comp_k]
         # unmount component
-        self.elem.removeChild(component.elem)
+        component.umount()
 
-    def add_html(self, html, tag):
+    def remove_all(self):
+        for c in self.children:
+            c.umount()
+        self.children = []
+        self.ids = {}
+
+    def umount(self):
+        self.parent.elem.removeChild(self.elem)
+        del self.elem
+
+    def add_html(self, html):
         """Simplifies adding HTML elements to a component"""
+        print("Adding", html)
         tp = TemplateProcessor()
         instructions = tp.parse("<HTMLComp>%s</HTMLComp>" % (html))
         old_instructions = self.instructions
