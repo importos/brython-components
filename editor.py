@@ -10,7 +10,7 @@ class ComponentEditor(Component):
     tag = "ComponentEditor"
     template = """<ComponentEditor>
                   <div class='panel'>
-                      <div><h3>Brython</h3><CodeMirror cid='e1' mode='python'></CodeMirror></div>
+                      <div><h3>Brython</h3><CodeMirror cid='e1' mode='"python"'></CodeMirror></div>
                       <div><h3>HTML</h3><CodeMirror cid='e2'></CodeMirror>
                       <button onclick="{self.render_code()}">Render</button>
                       <button onclick="{self.share_code()}">Share</button>
@@ -47,7 +47,6 @@ class ComponentEditor(Component):
 
     def render_code(self):
         self.t+=1
-        print("URL", window.location.href, "HASH", window.location.hash)
         self.get('result').ifrm_source = 'editor_result.html?v=%s'%(self.t)
 
     def share_code(self):
@@ -55,8 +54,6 @@ class ComponentEditor(Component):
         html_editor = self.get('e2')
 
         data = "['''%s''', '''%s''']"%(python_editor.get_code(), html_editor.get_code())
-        print("DATA", data)
-
         encoded_code = window.Base64.encode(data)
         try:
             url = window.location.href.split('#')[0]
