@@ -1,0 +1,26 @@
+<html>
+
+       <head>
+            <script type="text/javascript" src="/src/brython.js"></script>
+       </head>
+
+    <body onload="brython();">
+
+        <script type="text/python">
+        from browser import document, alert, window, html
+        from components import init, Register, Component, Property
+
+        class MyComponent(Component):
+            template="<MyComponent>{self.msg}<br/><button data='{self.data}' onclick='{self.hello()}'>Button</button></MyComponent>"
+            msg = Property('Hello World')
+            data = Property('Data value')
+            def hello(self):
+                print("HELLOOOOOOOOOOOOOOOOOOOOOOOOOOOO!")
+
+        Register.add(MyComponent)
+        init()
+        </script>
+        <MyComponent></MyComponent>
+    </body>
+
+    </html>
