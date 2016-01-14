@@ -69,7 +69,7 @@ class CodeMirror(Component):
     
     def mount_editor(self):
         cm = window.CodeMirror
-        self.cm = cm(self.elem, {"lineNumbers": True, "mode": self.mode})
+        self.cm = cm(self.elem, {"lineNumbers": True,"indentUnit": 4, "mode": self.mode})
         #self.cm = cm.fromTextArea(self.get('txt').elem, {"value": self.value, "lineNumbers": False, "mode": self.mode})
     def get_code(self):
         return self.cm.getValue()
