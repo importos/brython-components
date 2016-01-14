@@ -4,19 +4,19 @@ author: Jeyson Molina <jeyson.mco@gmail.com>
 """
 
 ELEMENT, TEXT = 1, 3
-DOMEVENTS = ('onclick',	
-'oncontextmenu'	,
-'ondblclick',
-'onmousedown',
-'onmouseenter',	
-'onmouseleave',
-'onmousemove',	
-'onmouseover',	
-'onmouseout',	
-'onmouseup',	
-'onkeydown',	
-'onkeypress',	
-'onkeyup',)
+DOMEVENTS = ('onclick',
+             'oncontextmenu'	,
+             'ondblclick',
+             'onmousedown',
+             'onmouseenter',
+             'onmouseleave',
+             'onmousemove',
+             'onmouseover',
+             'onmouseout',
+             'onmouseup',
+             'onkeydown',
+             'onkeypress',
+             'onkeyup',)
 
 VAR = 'DYNODE'
 HTML_TAGS = ['A', 'ABBR', 'ACRONYM', 'ADDRESS', 'APPLET', 'AREA', 'B', 'BASE',
@@ -130,7 +130,67 @@ class Property(object):
         self.notify_observers(iid, instance, v)
 
 
-class Component(object):
+class ObjectWithProperties(object):
+
+    """An object that has properties (Property) and can bind callbacks to it"""
+
+    cnt = 0
+
+    def __init__(self):
+        ObjectWithProperties.cnt += 1
+        self.cnt = ObjectWithProperties.cnt
+
+    def iid(self):
+        return hex(id(self) + self.cnt)
+
+    def bind(self, propname, callback):
+        """Bind instance property to callback"""
+        cls = self.__class__
+        prop = getattr(cls, propname)
+        prop.reg_observer(self, callback)
+
+    def unbind(self, propname, callback):
+        cls = self.__class__
+        prop = getattr(cls, propname)
+        prop.unreg_observer(self, callback)
+
+    def update_with_expression(self, property_name, expression, context, obj=None):
+        """
+        Updates obj.propname with a value resulting from the evaluation of expression each time
+        a property referenced in the expression is changed. Those properties belong to context['self'] obj.
+        EJ:
+        self.update_with_expression('a', 'self.a + self.b', {'self': cat})
+
+        This translates to:
+        "self.a = cat.a + cat.b"  executed every time cat.a or cat.b changes.
+        Note that 'self' in expression is object cat as stated in context parameter
+        If obj is None then obj=self
+        """
+        if obj is None:
+            obj = self
+        context_self = context['self']
+        cbackp = self.chain_prop_cback(property_name, expression, context, obj)
+
+        for var in match(expression, REGEX_SELF):
+            lastprop = var[5:]
+            context_self.bind(lastprop, cbackp)
+        # force update of any of the props in expression to compute an initial
+        # value to obj.propname
+        getattr(context_self.__class__, lastprop).force_change(context_self)
+
+    def chain_prop_cback(self, propname, expression, context, obj=None):
+        """returns a proper callback  that updates self.propname with evaluated expression, to be binded to a property.
+        """
+        return partial(self._chain_prop, propname=propname, expression=expression, context=context, obj=obj)
+
+    def _chain_prop(self, value, instance, propname, expression, context, obj):
+        # assign
+        v = eval(expression, context)  # TODO security?
+        setattr(obj, propname, v)
+
+
+class Component(ObjectWithProperties):
+
     """
     Base Component class. All components inherit from it.
     Every Component is linked with a DOMNode element (component.elem) which is present
@@ -138,17 +198,22 @@ class Component(object):
     """
     tag = None  # Tag used to identify components in DOM. If None class name is used.
     rendertag = None  # Tag used to render the component in DOM
-    template = "" # Template used to build the internals of the component
-    instructions = [] # Template string is parsed and compiled into a set of instructions
-    elem = Property(None) #DOMNode
+    template = ""  # Template used to build the internals of the component
+    # Template string is parsed and compiled into a set of instructions
+    instructions = []
+    elem = Property(None)  # DOMNode
     html = Property(None)
-    children = None # Children Components
-    ids = {} # Ids dict to quickly access child comps by their cid (comp.get('child_cid'))
-    parent = None # Parent Component.
-    root = None # Root component (The first component that initiated the mount)
+    children = None  # Children Components
+    # Ids dict to quickly access child comps by their cid
+    # (comp.get('child_cid'))
+    ids = {}
+    parent = None  # Parent Component.
+    # Root component (The first component that initiated the mount)
+    root = None
     is_mounted = Property(False)
 
     def __init__(self, domnode=None):
+        super(Component, self).__init__()
         cls = self.__class__
         attrs = dir(cls)
         self._prop_list = []
@@ -195,12 +260,13 @@ class Component(object):
         # Setting props from DOM to Component (only if it's not HTML Comp)
         # Grab props from root domnode and use them to initialize component's
         # props
+        pprint("Parsing properties values from DOM to Component")
         if not isinstance(self, HTMLComp):
             for attr in self.elem.attributes:
                 try:
                     name, value = attr.name, attr.value
                     if name not in ['cid', 'rd']:
-                        setattr(self, name,eval(value))
+                        setattr(self, name, eval(value))
                 except:
                     pass
         # mark as mounted
@@ -215,7 +281,6 @@ class Component(object):
         parentcomp = self
         instruction_set = self.instructions
         context_self = self.context['self']
-        context_cls = context_self.__class__
 
         for instruction in instruction_set:
             type_ = instruction[0]
@@ -253,15 +318,9 @@ class Component(object):
                     comp = self.create_component(nodename)
                     expression = instruction[2]
                     # TODO who is self? Analyze more.
-                    eval_expr = [expression, self.context]
-
                     # Bind all attributes in expression
-                    for var in match(expression, REGEX_SELF):
-                        context_self.bind(
-                            var[5:], comp.chain_prop('html', expression=eval_expr, obj=comp))
-                    # force update of chained prop by firing any prop in the
-                    # expression
-                    getattr(context_cls, var[5:]).force_change(context_self)
+                    comp.update_with_expression(
+                        'html', expression, self.context, comp)
                     comp.is_mounted = True
                 else:  # Components of classic HTML nodes
                     comp = self.create_component(nodename)
@@ -275,26 +334,19 @@ class Component(object):
                             pprint("setting dyn attr", name, value)
                             expression = value[2:-2]  # value= "|{expression}|"
                             # TODO who is self? Analyze more.
-                            eval_expr = [expression, self.context]
 
                             # Check if is event or normal attribute
                             if name not in DOMEVENTS:
-                                # Bind all attributes in expression
-                                for var in match(expression, REGEX_SELF):
-                                    # We use comp.elem because we're binding
-                                    # domnode attributes
-                                    context_self.bind(
-                                        var[5:], comp.chain_prop(name, expression=eval_expr, obj=comp.elem))
                                 comp.elem.setAttributeNode(attr_dom)
-                                # force update of chained prop by firing any
-                                # prop in the expression
-                                getattr(context_cls, var[5:]).force_change(
-                                    context_self)
+                                comp.update_with_expression(
+                                    name, expression, self.context, comp.elem)
                             else:
                                 # Event
                                 eventname = name[2:]
+                                pprint(
+                                    "BINDING DOM Event", eventname, " to expression", expression)
                                 comp.elem.bind(
-                                    eventname, context_self.domevent_callback(eval_expr))
+                                    eventname, context_self.domevent_callback(expression, self.context))
 
                         else:
                             # Normal attr
@@ -305,7 +357,7 @@ class Component(object):
                     comp.instructions = child_instructions
                     comp.mount(context=self.context)
                     #self.parse_instructions(comp, child_instructions)
-            pprint("Adding COMP", comp)
+            pprint("Adding COMP", comp, comp.tag)
 
             # Add comp to cid dict for quick retrieval
             context_self._add_cid(comp, cid)
@@ -328,20 +380,6 @@ class Component(object):
             dom_elem = window.__BRYTHON__.DOMNode(dom)
         return dom_elem
 
-    def bind(self, propname, callback):
-        """Bind instance property to callback"""
-        cls = self.__class__
-        prop = getattr(cls, propname)
-        prop.reg_observer(self, callback)
-
-    def unbind(self, propname, callback):
-        cls = self.__class__
-        prop = getattr(cls, propname)
-        prop.unreg_observer(self, callback)
-
-    def iid(self):
-        return hex(id(self))
-
     def on_elem(self, value, instance):
         pprint(("dom element", value))
 
@@ -350,12 +388,14 @@ class Component(object):
 
     def on_is_mounted(self, value, instance):
         self.on_mount(self)
-    
+
     def on_mount(self):
         pass
 
     def render(self, before=None, after=None):
         """Adds self.elem to parent.elem. It's finally rendered on site when parent.elem is added to a DOMNode that is already on site"""
+        pprint("Rendedering", self, "domnode", self.elem,
+               "to parent", self.parent, "domnode", self.parent.elem)
         if before is not None:
             self.parent.elem.insertBefore(self.elem, before.elem)
         elif after is not None:
@@ -371,7 +411,6 @@ class Component(object):
         if not comp.is_mounted:
             comp.root = self.root
             comp.mount()
-
 
         comp.render(before, after)
 
@@ -399,7 +438,7 @@ class Component(object):
 
     def remove_all(self):
         for c in self.children:
-            c.umount()
+            c.unmount()
         self.children = []
         self.ids = {}
 
@@ -419,33 +458,19 @@ class Component(object):
         self.instructions = old_instructions
 
     # Properties methods
-    def chain_prop(self, propname, expression=None, obj=None):
-        """returns a proper callback to be binded to a property change. This callback updates obj.propname internally.
-        obj can be the component (self) or the dom node (self.elem)
-        """
-        return partial(self._chain_prop, propname=propname, expression=expression, obj=obj)
-
-    def _chain_prop(self, value, instance, propname, expression, obj):
-        if expression is None:
-            setattr(obj, propname, value)
-        else:
-            # assign
-            eval_str, globals_ = expression
-            v = eval(eval_str, globals_)  # TODO security?
-            setattr(obj, propname, v)
 
     # Events Logic
-    def domevent_callback(self, expression):
-        """Links a domevent to an instance callback"""
-        return partial(self._domevent_callback, expression=expression)
+    def domevent_callback(self, expression, context):
+        """Returns a callback that evals expression using context as globals"""
+        return partial(self._domevent_callback, expression=expression, context=context)
 
-    def _domevent_callback(self, event, expression):
-        pprint("EVENT", event, "expression", expression[0])
-        eval_str, globals_ = expression
-        eval(eval_str, globals_)  # TODO security?
+    def _domevent_callback(self, event, expression, context):
+        pprint("EVENT", event, "expression", expression)
+        eval(expression, context)  # TODO security?
 
 
 class HTMLComp(Component):
+
     """Component for normal HTML nodes (<a>, <b>, <div>, <p>, etc.)"""
     value = Property('')
 
@@ -484,20 +509,6 @@ def callback(value, instance):
     pprint(("Value", value, "instance", instance))
 
 
-def match(text, regex):
-    jstext = JSConstructor(window.String)(text)
-    return jstext.match(regex)
-
-
-def match_replace(text, regex, replace):
-    jstext = JSConstructor(window.String)(text)
-    return jstext.replace(regex, replace)
-
-
-def match_search(text, regex):
-    jstext = JSConstructor(window.String)(text)
-    return jstext.search(regex)
-
 CONSOLE_ENABLED = False
 
 
@@ -506,6 +517,7 @@ def pprint(*args, **kwargs):
     if CONSOLE_ENABLED or force:
         print(args)
 
+DP = None
 try:
     from browser import document, alert, window, html, console
     from javascript import JSConstructor
@@ -515,14 +527,40 @@ try:
     REGEX_SELF = JSConstructor(window.RegExp)("self\.[a-zA-z]{1,}", 'g')
     REGEX_BRACKETS = JSConstructor(window.RegExp)("\{(.*?)\}", 'g')
 
+    def match(text, regex):
+        jstext = JSConstructor(window.String)(text)
+        return jstext.match(regex)
+
+    def match_replace(text, regex, replace):
+        jstext = JSConstructor(window.String)(text)
+        return jstext.replace(regex, replace)
+
+    def match_search(text, regex):
+        jstext = JSConstructor(window.String)(text)
+        return jstext.search(regex)
 except:
-    pprint("No browser libs.", force=True)
+    pprint("No brython and javascript libs.", force=True)
+
+    import re
+
+    REGEX_SELF = re.compile("self\.[a-zA-z]{1,}")
+    REGEX_BRACKETS = re.compile("\{(.*?)\}")
+
+    def match(text, regex):
+        return re.findall(regex, text)
+
+    def match_replace(text, regex, replace):
+        raise Exception
+
+    def match_search(text, regex):
+        raise Exception
 
 
 Main = []
 
 
 class Register(object):
+
     """Registers Components"""
     reg = []
 
@@ -580,8 +618,9 @@ def init():
 
 
 class TemplateProcessor(object):
+
     """Parses Component's template into an instructions set """
-    dp = JSConstructor(window.DOMParser)()
+    dp = DP
 
     def parse(self, template):
         k = time.time()
@@ -594,6 +633,7 @@ class TemplateProcessor(object):
         return self.instructions
 
     def parse_children(self, parentnode, level=0):
+        pprint("Parsing template")
         pprint("ParentNode", parentnode)
         instructions = []
         for node in parentnode.children:
@@ -619,4 +659,5 @@ class TemplateProcessor(object):
                 d.append(self.parse_children(node, level + 1))
                 instructions.append(d)  # TODO attributes
 
+        pprint("Parsing template Ended.")
         return instructions
