@@ -1,4 +1,5 @@
-['''
+TITLE = "Filtered list"
+CODE = ['''
 from components import Register, Component, Property
 
 

@@ -1,5 +1,5 @@
-['''
-from components import Register, Component, Property
+TITLE = "HelloWorld"
+CODE = ['''from components import Register, Component, Property
 from browser import alert
 
 class MyComponent(Component):

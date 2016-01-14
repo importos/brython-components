@@ -1,4 +1,5 @@
-['''
+TITLE = "Timer"
+CODE = ['''
 from components import Register, Component, Property
 from browser import timer
 
