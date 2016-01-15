@@ -517,7 +517,7 @@ def callback(value, instance):
     pprint(("Value", value, "instance", instance))
 
 
-CONSOLE_ENABLED = True
+CONSOLE_ENABLED = False
 
 
 def pprint(*args, **kwargs):
