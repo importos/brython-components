@@ -1,6 +1,6 @@
 TITLE = "Filtered List 2"
 CODE = ['''
-from custom import FilteredList
+from components.custom import FilteredList
 from components import Register, Component, Property
 
 
