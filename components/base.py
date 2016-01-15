@@ -74,8 +74,14 @@ class Property(object):
         try:
             return self.storage[iid]
         except:
-            self.storage[iid] = self.defaultvalue
-            return self.defaultvalue
+            if isinstance(self.defaultvalue, list):
+                v = list(self.defaultvalue)
+            elif isinstance(self.defaultvalue, dict):
+                v = dict(self.defaultvalue)
+            else:
+                v = self.defaultvalue
+            self.storage[iid] = v
+            return v
 
         return self.value
 
@@ -188,6 +194,8 @@ class ObjectWithProperties(object):
         v = eval(expression, context)  # TODO security?
         setattr(obj, propname, v)
 
+    def force_change(self, propname):
+        getattr(self.__class__, propname).force_change(self)
 
 class Component(ObjectWithProperties):
 
@@ -524,7 +532,7 @@ try:
     import time
     #jq = window.jQuery
     DP = JSConstructor(window.DOMParser)()
-    REGEX_SELF = JSConstructor(window.RegExp)("self\.[a-zA-z]{1,}", 'g')
+    REGEX_SELF = JSConstructor(window.RegExp)("self\.[A-Za-z0-9_]{1,}", 'g')
     REGEX_BRACKETS = JSConstructor(window.RegExp)("\{(.*?)\}", 'g')
 
     def match(text, regex):
@@ -543,7 +551,7 @@ except:
 
     import re
 
-    REGEX_SELF = re.compile("self\.[a-zA-z]{1,}")
+    REGEX_SELF = re.compile("self\.[A-Za-z0-9_]{1,}")
     REGEX_BRACKETS = re.compile("\{(.*?)\}")
 
     def match(text, regex):

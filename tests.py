@@ -143,7 +143,7 @@ class TestComponent(unittest.TestCase):
         self.assertEqual(li_comp.elem.a, "%s"%(obj.a)) # should be 0
         obj.a = 2
         self.assertEqual(li_comp.elem.a, "%s"%(obj.a)) # should be 2
-
+        
 
 class MyComponent(Component):
     template="<MyComponent></MyComponent>"
