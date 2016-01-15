@@ -509,7 +509,7 @@ def callback(value, instance):
     pprint(("Value", value, "instance", instance))
 
 
-CONSOLE_ENABLED = False
+CONSOLE_ENABLED = True
 
 
 def pprint(*args, **kwargs):
@@ -649,7 +649,8 @@ class TemplateProcessor(object):
                         instructions.append(d)
                     else:
                         # Text node
-                        instructions.append((TEXT, txt))
+                        if len(txt):
+                            instructions.append((TEXT, txt))
             else:
                 pprint("%sFound element:" %
                        ('--' * level), node, "Name:", node.nodeName)
