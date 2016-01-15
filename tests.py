@@ -1,5 +1,5 @@
 import tester as unittest
-from components import ObjectWithProperties, Property, HTMLComp, Component
+from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor
 from browser import document
 
 class ObjTest(ObjectWithProperties):
@@ -59,7 +59,9 @@ class TestProperties(unittest.TestCase):
 
         self.assertEqual(result[0], 1)
 
+
 class TestComponent(unittest.TestCase):
+    tp = TemplateProcessor()
 
     def test_htmlcomp_dom_creation(self):
         obj = HTMLComp('LI')
@@ -75,16 +77,79 @@ class TestComponent(unittest.TestCase):
         obj.add(c)
         self.assertEqual(obj.children[0], c)
 
+    def test_comp_add_html(self):
+        obj = MyComponent()
+        obj.mount() # Needed to add self.context
+        obj.add_html("<li><b>Test</b></li>")
+        lastc = obj.children[0]
+        self.assertEqual(lastc.elem.nodeName, 'LI')
+        self.assertEqual(lastc.children[0].elem.nodeName, 'B')
+
     def test_comp_remove(self):
         obj = MyComponent()
         c = HTMLComp('LI')
         obj.add(c)
         obj.remove(c)
         self.assertEqual(len(obj.children), 0)
+    
+    def test_parse_template(self):
+        template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
+        expected = [(3, 'Text node'), [1, 'LI', [('a', '1'), ('b', '|{self.b}|')], [[1, 'DYNODE', 'self.a']]]]
+        tp = TemplateProcessor()
+        result = tp.parse(template)
+        self.assertEqual(result, expected)
+
+    def test_parse_instructions(self):
+        obj = MyComponent()
+        template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
+        obj.instructions = self.tp.parse(template)
+        obj.mount()
+        li_comp = obj.children[1]
+
+        self.assertEqual(len(obj.children), 2)
+        self.assertEqual(obj.children[0].elem.text, "Text node")
+        self.assertEqual(li_comp.elem.nodeName, "LI")
+        self.assertEqual(li_comp.elem.a, "1")
+        self.assertEqual(li_comp.elem.b, "2")
+        self.assertEqual(li_comp.children[0].elem.nodeName, "DYNODE")
+
+    def test_render(self):
+        obj = MyComponent()
+        template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
+        expected = """Text node<li a="1" b="2" rd="1"><dynode>0</dynode></li>"""
+        obj.instructions = self.tp.parse(template)
+        obj.mount()
+        
+        self.assertEqual(obj.elem.html, expected)
+
+    def test_dynode_change(self):
+        obj = MyComponent()
+        template ="""<comp>{self.a}</comp>"""
+        obj.instructions = self.tp.parse(template)
+        obj.mount()
+        
+        dynode = obj.children[0]
+        self.assertEqual(dynode.elem.html, "%s"%(obj.a)) # should be 0
+        obj.a = 2
+        self.assertEqual(dynode.elem.html, "%s"%(obj.a)) # should be 2
+
+    def test_dom_attr_change(self):
+        obj = MyComponent()
+        template ="""<comp><li a='{self.a}'></li></comp>"""
+        obj.instructions = self.tp.parse(template)
+        obj.mount()
+
+        li_comp = obj.children[0]
+        self.assertEqual(li_comp.elem.a, "%s"%(obj.a)) # should be 0
+        obj.a = 2
+        self.assertEqual(li_comp.elem.a, "%s"%(obj.a)) # should be 2
+
 
 class MyComponent(Component):
     template="<MyComponent></MyComponent>"
     tag = 'MyComponent'
+    a = Property(0)
+    b = Property(2)
     
 
 
