@@ -219,25 +219,21 @@ class Component(ObjectWithProperties):
     # Root component (The first component that initiated the mount)
     root = None
     is_mounted = Property(False)
+    _prop_list = []
 
     def __init__(self, domnode=None):
         super(Component, self).__init__()
-        cls = self.__class__
-        attrs = dir(cls)
-        self._prop_list = []
         self.children = []
         self.ids = {}
 
         # Bind on_property of instance for each prop
-        for attr in attrs:
-            a = getattr(cls, attr)
-            if isinstance(a, Property):
-                #self._prop_list.append(a)
-                try:
-                    callback = getattr(self, "on_%s" % (attr))
-                    self.bind(attr, callback)
-                except:
-                    pass
+        for propname in self._prop_list:
+            try:
+                callback = getattr(self, "on_%s" % (propname))
+                print("callback", propname)
+                self.bind(propname, callback)
+            except:
+                pass
         # Default callbacks
         callback = getattr(self, "on_elem")
         self.bind("elem", callback)
@@ -542,8 +538,7 @@ CONSOLE_ENABLED = False
 def pprint(*args, **kwargs):
     force = kwargs['force'] if 'force' in kwargs else False
     if CONSOLE_ENABLED or force:
-        pass
-        #print(args)
+        print(args)
 
 DP = None
 try:
@@ -600,7 +595,6 @@ class Register(object):
     def get_component_class(cls, cls_name):
         cls_ = None
         for comp_cls in Register.reg:
-            print(comp_cls.__name__)
             if comp_cls.__name__.upper() == cls_name:
                 cls_ = comp_cls
                 break
@@ -619,7 +613,14 @@ def compile_comps_cls():
         # End parsing
         if comp_cls.tag is None:
             comp_cls.tag = comp_cls.__name__
-
+        #props list
+        comp_cls._prop_list = []
+        attrs = dir(comp_cls)
+        for attr in attrs:
+            a = getattr(comp_cls, attr)
+            if isinstance(a, Property):
+                comp_cls._prop_list.append(attr)
+        pprint("proplist for ", comp_cls , comp_cls._prop_list)
 
 def render(event):
 
