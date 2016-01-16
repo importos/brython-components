@@ -71,9 +71,9 @@ class Property(object):
             return self
 
         iid = instance.iid
-        try:
+        if iid in self.storage:
             return self.storage[iid]
-        except:
+        else:
             if isinstance(self.defaultvalue, list):
                 v = list(self.defaultvalue)
             elif isinstance(self.defaultvalue, dict):
@@ -88,28 +88,24 @@ class Property(object):
     def __set__(self, instance, value):
         pprint(("SET", value, instance))
         iid = instance.iid
-        try:
+        if iid in self.storage:
             oldvalue = self.storage[iid]
-        except:
-            self.storage[iid] = value
-            self.notify_observers(iid, instance, value)
-        else:
             # TODO Comparison against old value works only with numbers and strings. Needs different logic
             # for lists and objects
             if value != oldvalue:
                 self.storage[iid] = value
                 self.notify_observers(iid, instance, value)
 
+        else:
+            self.storage[iid] = value
+            self.notify_observers(iid, instance, value)
+            
     def reg_observer(self, instance, observer):
         iid = instance.iid
-        try:
-            if observer in self.observers[iid]:
-                raise ObserverAlreadyRegistered()
-            pprint("registing observer %s to %s" % (observer, iid))
-            self.observers[iid].append(observer)
-        except ObserverAlreadyRegistered:
-            pprint("Observer", observer, "already registered to", iid)
-        except:
+        if iid in self.observers:
+            if observer not in self.observers[iid]:
+                self.observers[iid].append(observer)
+        else:
             self.observers[iid] = [observer]
 
     def unreg_observer(self, instance, observer):
@@ -411,8 +407,6 @@ class Component(ObjectWithProperties):
 
     def render(self, before=None, after=None):
         """Adds self.elem to parent.elem. It's finally rendered on site when parent.elem is added to a DOMNode that is already on site"""
-        pprint("Rendedering", self, "domnode", self.elem,
-               "to parent", self.parent, "domnode", self.parent.elem)
         if before is not None:
             self.parent.elem.insertBefore(self.elem, before.elem)
         elif after is not None:
