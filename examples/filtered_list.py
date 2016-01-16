@@ -40,4 +40,4 @@ Register.add(ListItem)
 '''
 ,
 
-'''<FilteredList items="['Apples', 'Pears', 'Oranges', 'Bananas', 'Papayas', 'Mangos', 'Grapes']" ></FilteredList>''']
+'''<FilteredList items="{['Apples', 'Pears', 'Oranges', 'Bananas', 'Papayas', 'Mangos', 'Grapes']}" ></FilteredList>''']
