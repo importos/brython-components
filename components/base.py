@@ -180,9 +180,9 @@ class ObjectWithProperties(object):
         for var in match(expression, REGEX_SELF):
             lastprop = var[5:]
             context_self.bind(lastprop, cbackp)
-        # force update of any of the props in expression to compute an initial
-        # value to obj.propname
-        getattr(context_self.__class__, lastprop).force_change(context_self)
+
+        # Call manually to set an initial value
+        self._chain_prop(None, self, property_name, expression, context, obj)
 
     def chain_prop_cback(self, propname, expression, context, obj=None):
         """returns a proper callback  that updates self.propname with evaluated expression, to be binded to a property.
@@ -232,7 +232,7 @@ class Component(ObjectWithProperties):
         for attr in attrs:
             a = getattr(cls, attr)
             if isinstance(a, Property):
-                self._prop_list.append(a)
+                #self._prop_list.append(a)
                 try:
                     callback = getattr(self, "on_%s" % (attr))
                     self.bind(attr, callback)
@@ -265,25 +265,31 @@ class Component(ObjectWithProperties):
             "self": self, "root": self.root} if context is None else context
         self.parse_instructions()
 
-        # Setting props from DOM to Component (only if it's not HTML Comp)
+        # Setting props from DOM to Component 
         # Grab props from root domnode and use them to initialize component's
         # props
         pprint("Parsing properties values from DOM to Component")
-        if not isinstance(self, HTMLComp):
-            for attr in self.elem.attributes:
-                try:
-                    name, value = attr.name, attr.value
-                    if name not in ['cid', 'rd']:
-                        setattr(self, name, eval(value))
-                except:
-                    pass
+        for attr in self.elem.attributes:
+            try:
+                name, value = attr.name, attr.value
+                if name not in ['cid', 'rd']:
+
+                    if match_search(value, REGEX_BRACKETS) != -1:
+                        setattr(self, name, eval(value[1:-1])) 
+                    else:
+                        setattr(self, name, value)
+            except:
+                pass
         # mark as mounted
+        self._mark_as_mounted()
+        pprint("ET Mount %s" % (time.time() - k), force=True)
+        return self
+
+    def _mark_as_mounted(self):
         attr_rd = window.document.createAttribute("rd")
         attr_rd.value = '1'
         self.elem.setAttributeNode(attr_rd)
-        pprint("ET Mount %s" % (time.time() - k), force=True)
         self.is_mounted = True
-        return self
 
     def parse_instructions(self):
         parentcomp = self
@@ -409,7 +415,8 @@ class Component(ObjectWithProperties):
         elif after is not None:
             self.parent.elem.insertAfter(self.elem, after.elem)
         else:
-            self.parent.elem <= self.elem
+            #self.parent.elem <= self.elem
+            pass
 
     def add(self, comp, before=None, after=None):
         """Adds child component"""
@@ -489,6 +496,14 @@ class HTMLComp(Component):
     def on_html(self, value, instance):
         self.elem.innerHTML = value
 
+    def mount(self, context=None):
+        self.context = {
+            "self": self, "root": self.root} if context is None else context
+        self.parse_instructions()
+        # mark as mounted
+        self._mark_as_mounted()
+        return self
+
 
 # From functools
 def partial(func, *args, **keywords):
@@ -523,7 +538,8 @@ CONSOLE_ENABLED = False
 def pprint(*args, **kwargs):
     force = kwargs['force'] if 'force' in kwargs else False
     if CONSOLE_ENABLED or force:
-        print(args)
+        pass
+        #print(args)
 
 DP = None
 try:
@@ -616,8 +632,9 @@ def render(event):
                 pass
             mc = comp_cls(elem)
             mc.root = mc
+            k = time.time()
             mc.mount()
-            Main.append(mc)
+            print("ET MOUNT", time.time() - k)
 
 
 def init():
