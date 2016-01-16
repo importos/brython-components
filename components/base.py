@@ -286,11 +286,16 @@ class Component(ObjectWithProperties):
         return self
 
     def _mark_as_mounted(self):
-        attr_rd = window.document.createAttribute("rd")
-        attr_rd.value = '1'
-        self.elem.setAttributeNode(attr_rd)
+        self._dom_newattr("rd", "1")
         self.is_mounted = True
+    
+    def _dom_newattr(self, name, value):
+        attr = window.document.createAttribute(name)
+        attr.value = value
+        self.elem.setAttributeNode(attr)
+        return attr
 
+        
     def parse_instructions(self):
         parentcomp = self
         instruction_set = self.instructions
@@ -320,9 +325,7 @@ class Component(ObjectWithProperties):
                         # Set props to DOM
                         for attr in attributes:
                             name, value = attr
-                            attr_dom = window.document.createAttribute(name)
-                            attr_dom.value = value
-                            comp.elem.setAttributeNode(attr_dom)
+                            comp._dom_newattr(name, value)
 
                         comp.mount()
                     except Exception as e:
@@ -342,7 +345,7 @@ class Component(ObjectWithProperties):
                     # Setting props from Component to DOM
                     for attr in attributes:
                         name, value = attr
-                        attr_dom = window.document.createAttribute(name)
+                        #attr_dom = window.document.createAttribute(name)
                         if (match_search(value, REGEX_BRACKETS) != -1):
                             # Dyn
                             pprint("setting dyn attr", name, value)
@@ -351,7 +354,8 @@ class Component(ObjectWithProperties):
 
                             # Check if is event or normal attribute
                             if name not in DOMEVENTS:
-                                comp.elem.setAttributeNode(attr_dom)
+                                #comp.elem.setAttributeNode(attr_dom)
+                                comp._dom_newattr(name, '')
                                 comp.update_with_expression(
                                     name, expression, self.context, comp.elem)
                             else:
@@ -364,8 +368,9 @@ class Component(ObjectWithProperties):
 
                         else:
                             # Normal attr
-                            attr_dom.value = value
-                            comp.elem.setAttributeNode(attr_dom)
+                            #attr_dom.value = value
+                            #comp.elem.setAttributeNode(attr_dom)
+                            comp._dom_newattr(name, value)
 
                     child_instructions = instruction[3]
                     comp.instructions = child_instructions
@@ -415,8 +420,7 @@ class Component(ObjectWithProperties):
         elif after is not None:
             self.parent.elem.insertAfter(self.elem, after.elem)
         else:
-            #self.parent.elem <= self.elem
-            pass
+            self.parent.elem <= self.elem
 
     def add(self, comp, before=None, after=None):
         """Adds child component"""
