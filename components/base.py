@@ -406,7 +406,7 @@ class Component(ObjectWithProperties):
         pprint(("html element", value))
 
     def on_is_mounted(self, value, instance):
-        self.on_mount(self)
+        self.on_mount()
 
     def on_mount(self):
         pass
