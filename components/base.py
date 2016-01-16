@@ -70,7 +70,7 @@ class Property(object):
         if instance is None:
             return self
 
-        iid = instance.iid()
+        iid = instance.iid
         try:
             return self.storage[iid]
         except:
@@ -87,7 +87,7 @@ class Property(object):
 
     def __set__(self, instance, value):
         pprint(("SET", value, instance))
-        iid = instance.iid()
+        iid = instance.iid
         try:
             oldvalue = self.storage[iid]
         except:
@@ -101,7 +101,7 @@ class Property(object):
                 self.notify_observers(iid, instance, value)
 
     def reg_observer(self, instance, observer):
-        iid = instance.iid()
+        iid = instance.iid
         try:
             if observer in self.observers[iid]:
                 raise ObserverAlreadyRegistered()
@@ -113,7 +113,7 @@ class Property(object):
             self.observers[iid] = [observer]
 
     def unreg_observer(self, instance, observer):
-        iid = instance.iid()
+        iid = instance.iid
         try:
             l = self.observers[iid]
             del l[l.index(observer)]
@@ -131,7 +131,7 @@ class Property(object):
         """
         To force a property value change even if the value didn't changed.
         """
-        iid = instance.iid()
+        iid = instance.iid
         v = self.storage[iid] if iid in self.storage else self.defaultvalue
         self.notify_observers(iid, instance, v)
 
@@ -141,12 +141,14 @@ class ObjectWithProperties(object):
     """An object that has properties (Property) and can bind callbacks to it"""
 
     cnt = 0
+    iid = None
 
     def __init__(self):
         ObjectWithProperties.cnt += 1
         self.cnt = ObjectWithProperties.cnt
+        self.iid = self._calc_iid()
 
-    def iid(self):
+    def _calc_iid(self):
         return hex(id(self) + self.cnt)
 
     def bind(self, propname, callback):
