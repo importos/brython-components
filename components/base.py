@@ -18,7 +18,9 @@ DOMEVENTS = ('onclick',
              'onkeypress',
              'onkeyup',)
 
-VAR = 'DYNODE'
+DYNODE = 'DYNODE'
+NORMAL_ATTR, EVENT_ATTR, DYN_ATTR = 1, 2, 3
+
 HTML_TAGS = ['A', 'ABBR', 'ACRONYM', 'ADDRESS', 'APPLET', 'AREA', 'B', 'BASE',
              'BASEFONT', 'BDO', 'BIG', 'BLOCKQUOTE', 'BODY', 'BR', 'BUTTON',
              'CAPTION', 'CENTER', 'CITE', 'CODE', 'COL', 'COLGROUP', 'DD',
@@ -157,7 +159,7 @@ class ObjectWithProperties(object):
         prop = getattr(cls, propname)
         prop.unreg_observer(self, callback)
 
-    def update_with_expression(self, property_name, expression, context, obj=None):
+    def update_with_expression(self, property_name, expression, context, obj=None, props2bind=None):
         """
         Updates obj.propname with a value resulting from the evaluation of expression each time
         a property referenced in the expression is changed. Those properties belong to context['self'] obj.
@@ -174,9 +176,13 @@ class ObjectWithProperties(object):
         context_self = context['self']
         cbackp = self.chain_prop_cback(property_name, expression, context, obj)
 
-        for var in match(expression, REGEX_SELF):
-            lastprop = var[5:]
-            context_self.bind(lastprop, cbackp)
+        if props2bind is None:
+            for var in match(expression, REGEX_SELF):
+                lastprop = var[5:]
+                context_self.bind(lastprop, cbackp)
+        else:
+            for prop in props2bind:
+                context_self.bind(prop, cbackp)
 
         # Call manually to set an initial value
         self._chain_prop(None, self, property_name, expression, context, obj)
@@ -307,34 +313,36 @@ class Component(ObjectWithProperties):
                 except:
                     cid = None
 
-                if nodename not in HTML_TAGS and nodename != VAR:
+                if nodename not in HTML_TAGS and nodename != DYNODE:
                     pprint("CREATE custom component, named", nodename)
                     try:
                         comp = Register.get_component_class(nodename)()
                         # Set props to DOM
                         for attr in attributes:
-                            name, value = attr
+                            name, value = attr[0:2]
+                            # TODO binding if there are props2bind
                             comp._dom_newattr(name, value)
 
                         comp.mount()
                     except Exception as e:
                         pprint("Couldnt add component ", nodename, e)
 
-                elif nodename == VAR:
+                elif nodename == DYNODE:
                     comp = self.create_component(nodename)
                     expression = instruction[2]
-                    # TODO who is self? Analyze more.
+                    props2bind = instruction[3]
                     # Bind all attributes in expression
                     comp.update_with_expression(
-                        'html', expression, self.context, comp)
+                        'html', expression, self.context, comp, props2bind)
                     comp.is_mounted = True
                 else:  # Components of classic HTML nodes
                     comp = self.create_component(nodename)
 
                     # Setting props from Component to DOM
                     for attr in attributes:
-                        name, value = attr
-                        if (match_search(value, REGEX_BRACKETS) != -1):
+                        name, value, type_ = attr[0:3]
+
+                        if (type_ == DYN_ATTR):
                             # Dyn
                             pprint("setting dyn attr", name, value)
                             expression = value[2:-2]  # value= "|{expression}|"
@@ -343,10 +351,10 @@ class Component(ObjectWithProperties):
                             # Check if is event or normal attribute
                             if name not in DOMEVENTS:
                                 comp._dom_newattr(name, '')
+                                props2bind = attr[3]
                                 comp.update_with_expression(
-                                    name, expression, self.context, comp.elem)
+                                    name, expression, self.context, comp.elem, props2bind)
                             else:
-                                # Event
                                 eventname = name[2:]
                                 pprint(
                                     "BINDING DOM Event", eventname, " to expression", expression)
@@ -653,9 +661,10 @@ class TemplateProcessor(object):
                 texts = node.text.split("|")
                 # Separate normal text nodes from dyncamic ones ({})
                 for txt in texts:
-                    if(match_search(txt, REGEX_BRACKETS) == 0):
+                    if(match_search(txt, REGEX_BRACKETS) != -1):
                         # Dynamic node
-                        d = [ELEMENT, VAR, txt[1:-1]]
+                        props2bind = [x[5:] for x in match(txt, REGEX_SELF)]
+                        d = [ELEMENT, DYNODE, txt[1:-1], props2bind]
                         instructions.append(d)
                     else:
                         # Text node
@@ -665,7 +674,19 @@ class TemplateProcessor(object):
                 pprint("%sFound element:" %
                        ('--' * level), node, "Name:", node.nodeName)
                 # Attributes
-                attributes = [(x.name, x.value) for x in node.attributes]
+                attributes = []
+                
+                for attr in node.attributes:
+                    name, value = attr.name, attr.value
+                    if(match_search(value, REGEX_BRACKETS) != -1):
+                        props2bind = [x[5:] for x in match(value, REGEX_SELF)]
+                        attributes.append((name, value, DYN_ATTR, props2bind))
+                    else:
+                        if name not in DOMEVENTS:
+                            attributes.append((name, value, NORMAL_ATTR))
+                        else:
+                            attributes.append((name, value, EVENT_ATTR))
+                #attributes = [(x.name, x.value) for x in node.attributes]
                 d = [ELEMENT, node.nodeName.upper(), attributes]
                 d.append(self.parse_children(node, level + 1))
                 instructions.append(d)  # TODO attributes

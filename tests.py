@@ -94,7 +94,7 @@ class TestComponent(unittest.TestCase):
     
     def test_parse_template(self):
         template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
-        expected = [(3, 'Text node'), [1, 'LI', [('a', '1'), ('b', '|{self.b}|')], [[1, 'DYNODE', 'self.a']]]]
+        expected = [(3, 'Text node'), [1, 'LI', [('a', '1', 1), ('b', '|{self.b}|', 3, ['b'])], [[1, 'DYNODE', 'self.a', ['a']]]]]
         tp = TemplateProcessor()
         result = tp.parse(template)
         self.assertEqual(result, expected)
