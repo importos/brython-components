@@ -49,10 +49,9 @@ class Property(object):
 
     """
     Property object that implements observer pattern. Use it in Component objects.
-    Values are stored in an internal dictionary using component.iid() as key.
+    Values are stored in an internal dictionary using object.iid as key.
     Observers (binded callback functions) are stored in a similar way.
     """
-    component = None
     defaultvalue = None
     observers = None  # List of observers
     storage = None
@@ -66,7 +65,7 @@ class Property(object):
         self.defaultvalue = default
 
     def __get__(self, instance, owner):
-        # This happens when prop is called from class instead of instance
+        # when instance is none is because it's called from class instead of instance
         if instance is None:
             return self
 
