@@ -44,7 +44,6 @@ class ComponentEditor(Component):
         window.editor_python = python_editor
         window.editor_html = html_editor
 
-
     def render_code(self):
         self.t+=1
         self.get('result').ifrm_source = 'editor_result.html?v=%s'%(self.t)
@@ -71,6 +70,14 @@ class CodeMirror(Component):
         cm = window.CodeMirror
         self.cm = cm(self.elem, {"lineNumbers": True,"indentUnit": 4, "mode": self.mode})
         #self.cm = cm.fromTextArea(self.get('txt').elem, {"value": self.value, "lineNumbers": False, "mode": self.mode})
+        self.refresh()
+
+    def refresh(self):
+        window.requestAnimationFrame(self._refresh)
+    
+    def _refresh(self, ev):
+        self.cm.refresh()
+
     def get_code(self):
         return self.cm.getValue()
 

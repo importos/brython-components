@@ -403,6 +403,9 @@ class Component(ObjectWithProperties):
         pass
 
     def render(self, before=None, after=None):
+        window.requestAnimationFrame(partial(self._render, before=before, after=after))
+
+    def _render(self, ev, before=None, after=None):
         """Adds self.elem to parent.elem. It's finally rendered on site when parent.elem is added to a DOMNode that is already on site"""
         if before is not None:
             self.parent.elem.insertBefore(self.elem, before.elem)
