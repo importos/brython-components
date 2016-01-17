@@ -284,10 +284,8 @@ class Component(ObjectWithProperties):
         self.is_mounted = True
     
     def _dom_newattr(self, name, value):
-        attr = window.document.createAttribute(name)
-        attr.value = value
-        self.elem.setAttributeNode(attr)
-        return attr
+        self.elem.setAttribute(name, value)
+        
 
         
     def parse_instructions(self):
@@ -573,9 +571,6 @@ except:
 
     def match_search(text, regex):
         raise Exception
-
-
-Main = []
 
 
 class Register(object):
