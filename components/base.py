@@ -99,7 +99,7 @@ class Property(object):
         else:
             self.storage[iid] = value
             self.notify_observers(iid, instance, value)
-            
+
     def reg_observer(self, instance, observer):
         iid = instance.iid
         if iid in self.observers:
@@ -195,6 +195,7 @@ class ObjectWithProperties(object):
     def force_change(self, propname):
         getattr(self.__class__, propname).force_change(self)
 
+
 class Component(ObjectWithProperties):
 
     """
@@ -259,7 +260,7 @@ class Component(ObjectWithProperties):
             "self": self, "root": self.root} if context is None else context
         self.parse_instructions()
 
-        # Setting props from DOM to Component 
+        # Setting props from DOM to Component
         # Grab props from root domnode and use them to initialize component's
         # props
         pprint("Parsing properties values from DOM to Component")
@@ -269,7 +270,7 @@ class Component(ObjectWithProperties):
                 if name not in ['cid', 'rd']:
 
                     if match_search(value, REGEX_BRACKETS) != -1:
-                        setattr(self, name, eval(value[1:-1])) 
+                        setattr(self, name, eval(value[1:-1]))
                     else:
                         setattr(self, name, value)
             except:
@@ -282,12 +283,10 @@ class Component(ObjectWithProperties):
     def _mark_as_mounted(self):
         self._dom_newattr("rd", "1")
         self.is_mounted = True
-    
+
     def _dom_newattr(self, name, value):
         self.elem.setAttribute(name, value)
-        
 
-        
     def parse_instructions(self):
         parentcomp = self
         instruction_set = self.instructions
@@ -313,7 +312,6 @@ class Component(ObjectWithProperties):
                     pprint("CREATE custom component, named", nodename)
                     try:
                         comp = Register.get_component_class(nodename)()
-                        #comp.elem = self._create_domelem(comp.tag, '')
                         # Set props to DOM
                         for attr in attributes:
                             name, value = attr
@@ -337,7 +335,6 @@ class Component(ObjectWithProperties):
                     # Setting props from Component to DOM
                     for attr in attributes:
                         name, value = attr
-                        #attr_dom = window.document.createAttribute(name)
                         if (match_search(value, REGEX_BRACKETS) != -1):
                             # Dyn
                             pprint("setting dyn attr", name, value)
@@ -346,7 +343,6 @@ class Component(ObjectWithProperties):
 
                             # Check if is event or normal attribute
                             if name not in DOMEVENTS:
-                                #comp.elem.setAttributeNode(attr_dom)
                                 comp._dom_newattr(name, '')
                                 comp.update_with_expression(
                                     name, expression, self.context, comp.elem)
@@ -360,14 +356,11 @@ class Component(ObjectWithProperties):
 
                         else:
                             # Normal attr
-                            #attr_dom.value = value
-                            #comp.elem.setAttributeNode(attr_dom)
                             comp._dom_newattr(name, value)
 
                     child_instructions = instruction[3]
                     comp.instructions = child_instructions
                     comp.mount(context=self.context)
-                    #self.parse_instructions(comp, child_instructions)
             pprint("Adding COMP", comp, comp.tag)
 
             # Add comp to cid dict for quick retrieval
@@ -379,7 +372,6 @@ class Component(ObjectWithProperties):
         dom_elem = self._create_domelem(tag, text)
         c = HTMLComp(tag, dom_elem)
         c.root = self.root
-        #c.elem = dom_elem
         return c
 
     def _create_domelem(self, tag, text=''):
@@ -466,8 +458,6 @@ class Component(ObjectWithProperties):
         self.parse_instructions(self, instructions)
         self.instructions = old_instructions
 
-    # Properties methods
-
     # Events Logic
     def domevent_callback(self, expression, context):
         """Returns a callback that evals expression using context as globals"""
@@ -539,7 +529,6 @@ try:
     from browser import document, alert, window, html, console
     from javascript import JSConstructor
     import time
-    #jq = window.jQuery
     DP = JSConstructor(window.DOMParser)()
     REGEX_SELF = JSConstructor(window.RegExp)("self\.[A-Za-z0-9_]{1,}", 'g')
     REGEX_BRACKETS = JSConstructor(window.RegExp)("\{(.*?)\}", 'g')
@@ -604,14 +593,15 @@ def compile_comps_cls():
         # End parsing
         if comp_cls.tag is None:
             comp_cls.tag = comp_cls.__name__
-        #props list
+        # props list
         comp_cls._prop_list = []
         attrs = dir(comp_cls)
         for attr in attrs:
             a = getattr(comp_cls, attr)
             if isinstance(a, Property):
                 comp_cls._prop_list.append(attr)
-        pprint("proplist for ", comp_cls , comp_cls._prop_list)
+        pprint("proplist for ", comp_cls, comp_cls._prop_list)
+
 
 def render(event):
 
