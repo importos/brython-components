@@ -104,10 +104,10 @@ class TestComponent(unittest.TestCase):
         template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
-        li_comp = obj.children[1]
+        li_comp = obj.children[2]
 
-        self.assertEqual(len(obj.children), 3) # textnode, <li>, and <style>
-        self.assertEqual(obj.children[0].elem.text, "Text node")
+        self.assertEqual(len(obj.children), 3) # <style> , textnode, and <li>
+        self.assertEqual(obj.children[1].elem.text, "Text node")
         self.assertEqual(li_comp.elem.nodeName, "LI")
         self.assertEqual(li_comp.elem.a, "1")
         self.assertEqual(li_comp.elem.b, "2")
@@ -116,7 +116,7 @@ class TestComponent(unittest.TestCase):
     def test_render(self):
         obj = MyComponent()
         template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
-        expected = """Text node<li a="1" b="2" rd="1"><dynode>0</dynode></li><style rd="1"></style>"""
+        expected = """<style rd="1"></style>Text node<li a="1" b="2" rd="1"><dynode>0</dynode></li>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
         self.assertEqual(obj.elem.html, expected)
@@ -127,7 +127,7 @@ class TestComponent(unittest.TestCase):
         obj.instructions = self.tp.parse(template)
         obj.mount()
         
-        dynode = obj.children[0]
+        dynode = obj.children[1]
         self.assertEqual(dynode.elem.html, "%s"%(obj.a)) # should be 0
         obj.a = 2
         self.assertEqual(dynode.elem.html, "%s"%(obj.a)) # should be 2
@@ -138,7 +138,7 @@ class TestComponent(unittest.TestCase):
         obj.instructions = self.tp.parse(template)
         obj.mount()
 
-        li_comp = obj.children[0]
+        li_comp = obj.children[1]
         self.assertEqual(li_comp.elem.a, "%s"%(obj.a)) # should be 0
         obj.a = 2
         self.assertEqual(li_comp.elem.a, "%s"%(obj.a)) # should be 2

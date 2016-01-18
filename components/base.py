@@ -298,6 +298,9 @@ class Component(ObjectWithProperties):
         k = time.time()
         self._dom_newattr("id", "%s_%s" % (self.__class__.__name__, self.iid))
 
+        # Create style comp and add it
+        self._mount_style()
+
         pprint("Mounting", self, "Instructions",
                self.instructions, "Context: ", context)
         self.context = {
@@ -320,8 +323,6 @@ class Component(ObjectWithProperties):
             except:
                 pass
 
-        # Create style comp and add it
-        self._mount_style()
 
         # mark as mounted
         self._mark_as_mounted()
