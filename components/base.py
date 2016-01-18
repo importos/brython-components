@@ -279,8 +279,11 @@ class Component(ObjectWithProperties):
         callback = getattr(self, "on_is_mounted")
         self.bind("is_mounted", callback)
 
-        callback = getattr(self, "on_style")
-        self.bind("style", callback)
+        try:
+            callback = getattr(self, "on_style")
+            self.bind("style", callback) #bind will fail if self.style is not Property
+        except:
+            pass 
 
         if domnode == None:
             tag = self.tag if self.rendertag is None else self.rendertag

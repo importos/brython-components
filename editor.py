@@ -23,6 +23,28 @@ class ComponentEditor(Component):
                   </div>
                   </ComponentEditor>"""
 
+    style = """
+            :host button{
+                line-height: 30px;
+                width: 200px;
+                display: inline-block;
+                margin: auto;
+                margin-top: 20px;
+                margin-bottom: 20px;
+                font-size: 30px;
+                cursor: pointer;
+            }
+            :host input{
+                line-height:30px;
+                width: 100%;
+            }
+            :host >div {
+                width: 45%;
+                margin-left: 10px;
+                float: left;
+            }
+
+            """
     t= 0
     def on_is_mounted(self, value, instance):
         print("Editors")
@@ -65,6 +87,14 @@ class CodeMirror(Component):
     tag = "CodeMirror"
     mode = Property('xml')
     template="<CodeMirror></CodeMirror>"
+    style = """
+              :host {
+                display: block;
+                background-color:  #444;;
+                padding: 10px;
+            }
+            :host .codemirror {min-height: 300px;}
+            """
     
     def mount_editor(self):
         cm = window.CodeMirror
@@ -85,6 +115,18 @@ class ResultComponent(Component):
     tag = "ResultComponent"
     ifrm_source = Property('editor_result.html')
     template = "<ResultComponent><iframe src='{self.ifrm_source}'></iframe></ResultComponent>"
+    style = """
+             :host {
+                display: block;
+                background-color:  #444;;
+                padding: 10px;
+            }
+             :host iframe{
+                background-color: #fff;
+                width: 100%;
+                min-height: 700px;
+            }
+            """
     
 Register.add(CodeMirror)
 Register.add(ResultComponent)
