@@ -1,5 +1,5 @@
 import tester as unittest
-from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor
+from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor, BrowserDOMRender
 from browser import document
 
 class ObjTest(ObjectWithProperties):
@@ -81,7 +81,7 @@ class TestComponent(unittest.TestCase):
         obj = MyComponent()
         obj.mount() # Needed to add self.context
         obj.add_html("<li><b>Test</b></li>")
-        lastc = obj.children[0]
+        lastc = obj.children[-1]
         self.assertEqual(lastc.elem.nodeName, 'LI')
         self.assertEqual(lastc.children[0].elem.nodeName, 'B')
 
@@ -91,7 +91,7 @@ class TestComponent(unittest.TestCase):
         obj.add(c)
         obj.remove(c)
         self.assertEqual(len(obj.children), 0)
-    
+
     def test_parse_template(self):
         template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
         expected = [(3, 'Text node'), [1, 'LI', [('a', '1', 1), ('b', '|{self.b}|', 3, ['b'])], [[1, 'DYNODE', 'self.a', ['a']]]]]
@@ -106,7 +106,7 @@ class TestComponent(unittest.TestCase):
         obj.mount()
         li_comp = obj.children[1]
 
-        self.assertEqual(len(obj.children), 2)
+        self.assertEqual(len(obj.children), 3) # textnode, <li>, and <style>
         self.assertEqual(obj.children[0].elem.text, "Text node")
         self.assertEqual(li_comp.elem.nodeName, "LI")
         self.assertEqual(li_comp.elem.a, "1")
@@ -116,10 +116,9 @@ class TestComponent(unittest.TestCase):
     def test_render(self):
         obj = MyComponent()
         template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
-        expected = """Text node<li a="1" b="2" rd="1"><dynode>0</dynode></li>"""
+        expected = """Text node<li a="1" b="2" rd="1"><dynode>0</dynode></li><style rd="1"></style>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
-        
         self.assertEqual(obj.elem.html, expected)
 
     def test_dynode_change(self):
@@ -144,6 +143,17 @@ class TestComponent(unittest.TestCase):
         obj.a = 2
         self.assertEqual(li_comp.elem.a, "%s"%(obj.a)) # should be 2
         
+    def test_style_scope(self):
+        obj = MyComponent()
+        template ="<comp><b>Hello</b></comp>"
+        obj.instructions = self.tp.parse(template)
+        obj.style = """:host {color: red;}"""
+
+        obj.mount()
+
+        expected = """#%s {color: red;}"""%(obj.elem.id)
+        self.assertEqual(obj._rendered_style, expected)
+        self.assertEqual(obj._style_comp.html, expected)
 
 class MyComponent(Component):
     template="<MyComponent></MyComponent>"
@@ -152,7 +162,7 @@ class MyComponent(Component):
     b = Property(2)
     
 
-
+BrowserDOMRender.direct = True
 TESTS = (TestProperties, TestComponent)
 report_html = ''
 document['status'].html = "Testing..."

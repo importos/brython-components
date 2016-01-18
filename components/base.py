@@ -67,7 +67,8 @@ class Property(object):
         self.defaultvalue = default
 
     def __get__(self, instance, owner):
-        # when instance is none is because it's called from class instead of instance
+        # when instance is none is because it's called from class instead of
+        # instance
         if instance is None:
             return self
 
@@ -141,12 +142,13 @@ class ObjectWithProperties(object):
     iid = None
 
     def __init__(self):
-        ObjectWithProperties.cnt += 1
         self.cnt = ObjectWithProperties.cnt
         self.iid = self._calc_iid()
+        ObjectWithProperties.cnt += 1
 
     def _calc_iid(self):
-        return hex(id(self) + self.cnt)
+        # return hex(id(self) + self.cnt)
+        return self.cnt
 
     def bind(self, propname, callback):
         """Bind instance property to callback"""
@@ -201,6 +203,30 @@ class ObjectWithProperties(object):
         getattr(self.__class__, propname).force_change(self)
 
 
+class DOMRender(object):
+    """Class used to render DOM"""
+    pass
+
+
+class BrowserDOMRender(DOMRender):
+    direct = False
+
+    def render(self, comp, before=None, after=None):
+        if BrowserDOMRender.direct:
+            self._render(None, comp, before, after)
+        else:
+            window.requestAnimationFrame(
+                partial(self._render, comp=comp, before=before, after=after))
+
+    def _render(self, ev, comp, before=None, after=None):
+        if before is not None:
+            comp.parent.elem.insertBefore(comp.elem, before.elem)
+        elif after is not None:
+            comp.parent.elem.insertAfter(comp.elem, after.elem)
+        else:
+            comp.parent.elem <= comp.elem
+
+
 class Component(ObjectWithProperties):
 
     """
@@ -225,6 +251,12 @@ class Component(ObjectWithProperties):
     is_mounted = Property(False)
     _prop_list = []
 
+    style = Property("")
+    _rendered_style = Property("")
+    _style_comp = None
+
+    dom_renderer = BrowserDOMRender()
+
     def __init__(self, domnode=None):
         super(Component, self).__init__()
         self.children = []
@@ -234,7 +266,6 @@ class Component(ObjectWithProperties):
         for propname in self._prop_list:
             try:
                 callback = getattr(self, "on_%s" % (propname))
-                print("callback", propname)
                 self.bind(propname, callback)
             except:
                 pass
@@ -248,6 +279,9 @@ class Component(ObjectWithProperties):
         callback = getattr(self, "on_is_mounted")
         self.bind("is_mounted", callback)
 
+        callback = getattr(self, "on_style")
+        self.bind("style", callback)
+
         if domnode == None:
             tag = self.tag if self.rendertag is None else self.rendertag
             self.elem = self._create_domelem(tag)
@@ -259,6 +293,8 @@ class Component(ObjectWithProperties):
         Process the Component (and its children): Parses instructions, binds properties and renders the DOMNode in the site.
         """
         k = time.time()
+        self._dom_newattr("id", "%s_%s" % (self.__class__.__name__, self.iid))
+
         pprint("Mounting", self, "Instructions",
                self.instructions, "Context: ", context)
         self.context = {
@@ -280,10 +316,22 @@ class Component(ObjectWithProperties):
                         setattr(self, name, value)
             except:
                 pass
+
+        # Create style comp and add it
+        self._mount_style()
+
         # mark as mounted
         self._mark_as_mounted()
         pprint("ET Mount %s" % (time.time() - k), force=True)
         return self
+
+    def _mount_style(self):
+        self._rendered_style = self.style.replace(
+            ":host", "#%s" % (self.elem.id))
+        if self._style_comp is None:
+            self._style_comp = HTMLComp(tag='style')
+            self.add(self._style_comp)
+        self._style_comp.html = self._rendered_style
 
     def _mark_as_mounted(self):
         self._dom_newattr("rd", "1")
@@ -396,6 +444,10 @@ class Component(ObjectWithProperties):
     def on_html(self, value, instance):
         pprint(("html element", value))
 
+    def on_style(self, value, instance):
+        if self.is_mounted:
+            self._mount_style()
+
     def on_is_mounted(self, value, instance):
         self.on_mount()
 
@@ -403,16 +455,7 @@ class Component(ObjectWithProperties):
         pass
 
     def render(self, before=None, after=None):
-        window.requestAnimationFrame(partial(self._render, before=before, after=after))
-
-    def _render(self, ev, before=None, after=None):
-        """Adds self.elem to parent.elem. It's finally rendered on site when parent.elem is added to a DOMNode that is already on site"""
-        if before is not None:
-            self.parent.elem.insertBefore(self.elem, before.elem)
-        elif after is not None:
-            self.parent.elem.insertAfter(self.elem, after.elem)
-        else:
-            self.parent.elem <= self.elem
+        return self.dom_renderer.render(self, before, after)
 
     def add(self, comp, before=None, after=None):
         """Adds child component"""
@@ -678,7 +721,7 @@ class TemplateProcessor(object):
                        ('--' * level), node, "Name:", node.nodeName)
                 # Attributes
                 attributes = []
-                
+
                 for attr in node.attributes:
                     name, value = attr.name, attr.value
                     if(match_search(value, REGEX_BRACKETS) != -1):
