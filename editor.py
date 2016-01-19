@@ -1,7 +1,7 @@
 """
 Editor component to edit and render Components code
 """
-from components import Component, Property, Register
+from components import Component, Property, Register, initialize_comps_classes
 from browser import document, window
 
 
@@ -24,7 +24,7 @@ class ComponentEditor(Component):
                   </ComponentEditor>"""
 
     style = """
-            :host button{
+            :host .panel div  button{
                 line-height: 30px;
                 width: 200px;
                 display: inline-block;
@@ -34,7 +34,7 @@ class ComponentEditor(Component):
                 font-size: 30px;
                 cursor: pointer;
             }
-            :host input{
+            :host .panel div input{
                 line-height:30px;
                 width: 100%;
             }
@@ -45,9 +45,8 @@ class ComponentEditor(Component):
             }
 
             """
-    t= 0
-    def on_is_mounted(self, value, instance):
-        print("Editors")
+
+    def on_mount(self):
         python_editor = self.get('e1')
         html_editor = self.get('e2')
         python_editor.mount_editor()
@@ -66,9 +65,28 @@ class ComponentEditor(Component):
         window.editor_python = python_editor
         window.editor_html = html_editor
 
+        self.render_code()
+
     def render_code(self):
-        self.t+=1
-        self.get('result').ifrm_source = 'editor_result.html?v=%s'%(self.t)
+        python_editor = self.get('e1')
+        html_editor = self.get('e2')
+        #Remove old component classes
+        for comp_cls in Register.reg:
+            if comp_cls not in (CodeMirror, ResultComponent, ComponentEditor):
+                Register.remove(comp_cls)
+        
+        python_code = python_editor.get_code()
+        try:
+            eval(python_code)
+        except Exception as e:
+            print("Error evaluating code ", e)
+        # Init comp classes again (User must have registered its comps in the code)
+        initialize_comps_classes()
+
+        # Add new html with components in it
+        result_comp = self.get('result')
+        result_comp.remove_all()
+        result_comp.add_html(html_editor.get_code())
 
     def share_code(self):
         python_editor = self.get('e1')
@@ -113,17 +131,13 @@ class CodeMirror(Component):
 
 class ResultComponent(Component):
     tag = "ResultComponent"
-    ifrm_source = Property('editor_result.html')
-    template = "<ResultComponent><iframe src='{self.ifrm_source}'></iframe></ResultComponent>"
+    template = "<ResultComponent></ResultComponent>"
     style = """
              :host {
                 display: block;
-                background-color:  #444;;
-                padding: 10px;
-            }
-             :host iframe{
-                background-color: #fff;
-                width: 100%;
+                background-color:  #fff;;
+                border: 10px solid #444;
+                padding: 15px;
                 min-height: 700px;
             }
             """

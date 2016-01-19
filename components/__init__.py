@@ -1,4 +1,4 @@
-from .base import Property, Component, ObjectWithProperties, Register, HTMLComp, TemplateProcessor, init, BrowserDOMRender
+from .base import Property, Component, ObjectWithProperties, Register, HTMLComp, TemplateProcessor, init, render, initialize_comps_classes, BrowserDOMRender
 
 # TODO Future: To load a precompiled version of components.base (See ticket #222 in Brython repo)
 """

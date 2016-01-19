@@ -257,6 +257,8 @@ class Component(ObjectWithProperties):
 
     dom_renderer = BrowserDOMRender()
 
+    cls_initialized = False
+
     def __init__(self, domnode=None):
         super(Component, self).__init__()
         self.children = []
@@ -363,12 +365,13 @@ class Component(ObjectWithProperties):
                     cid = [x[1] for x in attributes if x[0] == 'cid'][0]
                 except:
                     cid = None
-
                 if nodename not in HTML_TAGS and nodename != DYNODE:
                     pprint("CREATE custom component, named", nodename)
                     try:
                         comp = Register.get_component_class(nodename)()
-                        # Set Comp's props initial values  from DOM template
+                        # TODO We don't set domnode attributes based on template, only comp,, should we?
+                        comp.mount()
+                        # Once mounted Set Comp's props initial values  from DOM template
                         for attr in attributes:
                             name, value, type_ = attr[0:3]
                             if name == "cid":
@@ -379,8 +382,6 @@ class Component(ObjectWithProperties):
                                 comp.update_with_expression(name, expression, self.context, comp, props2bind)
                             else:
                                 setattr(comp, name, value)
-                        # TODO We don't set domnode attributes based on template, only comp,, should we?
-                        comp.mount()
                     except Exception as e:
                         pprint("Couldnt add component ", nodename, e)
 
@@ -501,7 +502,8 @@ class Component(ObjectWithProperties):
 
     def remove_all(self):
         for c in self.children:
-            c.unmount()
+            if c is not self._style_comp:
+                c.unmount()
         self.children = []
         self.ids = {}
 
@@ -647,11 +649,16 @@ class Register(object):
             pprint("Class component %s not found." % (cls_name))
         return cls_
 
+    @classmethod
+    def remove(cls, comp_cls):
+        cls.reg.remove(comp_cls)
 
-def compile_comps_cls():
+def initialize_comps_classes():
     tp = TemplateProcessor()
 
     for comp_cls in Register.reg:
+        if comp_cls.cls_initialized:
+            continue
         pprint("Initializing ", comp_cls)
         # Parsing template
         comp_cls.instructions = tp.parse(comp_cls.template)
@@ -666,6 +673,7 @@ def compile_comps_cls():
             if isinstance(a, Property):
                 comp_cls._prop_list.append(attr)
         pprint("proplist for ", comp_cls, comp_cls._prop_list)
+        comp_cls.cls_initialized = True
 
 
 def render(event):
@@ -688,7 +696,7 @@ def render(event):
 
 
 def init():
-    compile_comps_cls()
+    initialize_comps_classes()
     render()
 
 
