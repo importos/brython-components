@@ -681,9 +681,10 @@ def render(event):
                     continue
             except:
                 pass
-            mc = comp_cls(elem)
-            mc.root = mc
-            mc.mount()
+            rootcomp = comp_cls(elem)
+            rootcomp.root = rootcomp
+            rootcomp.mount()
+            # TODO What happens with root components? Are they garbage collected? Should we store a reference in a global variable?
 
 
 def init():
