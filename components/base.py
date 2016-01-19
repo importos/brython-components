@@ -295,7 +295,6 @@ class Component(ObjectWithProperties):
         """
         Process the Component (and its children): Parses instructions, binds properties and renders the DOMNode in the site.
         """
-        k = time.time()
         self._dom_newattr("id", "%s_%s" % (self.__class__.__name__, self.iid))
 
         # Create style comp and add it
@@ -327,7 +326,6 @@ class Component(ObjectWithProperties):
 
         # mark as mounted
         self._mark_as_mounted()
-        pprint("ET Mount %s" % (time.time() - k), force=True)
         return self
 
     def _mount_style(self):
@@ -592,7 +590,6 @@ DP = None
 try:
     from browser import document, alert, window, html, console
     from javascript import JSConstructor
-    import time
     DP = JSConstructor(window.DOMParser)()
     REGEX_SELF = JSConstructor(window.RegExp)("self\.[A-Za-z0-9_]{1,}", 'g')
     REGEX_BRACKETS = JSConstructor(window.RegExp)("\{(.*?)\}", 'g')
@@ -686,9 +683,7 @@ def render(event):
                 pass
             mc = comp_cls(elem)
             mc.root = mc
-            k = time.time()
             mc.mount()
-            print("ET MOUNT", time.time() - k)
 
 
 def init():
@@ -702,13 +697,11 @@ class TemplateProcessor(object):
     dp = DP
 
     def parse(self, template):
-        k = time.time()
         self.instructions = []
         data = template.replace('{', '|{').replace('}', '}|')
         dom = self.dp.parseFromString(data, "text/xml")
         rootnode = window.__BRYTHON__.DOMNode(dom).children[0]
         self.instructions = self.parse_children(rootnode)
-        pprint("ET %s" % (time.time() - k))
         return self.instructions
 
     def parse_children(self, parentnode, level=0):
