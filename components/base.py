@@ -307,21 +307,22 @@ class Component(ObjectWithProperties):
             "self": self, "root": self.root} if context is None else context
         self.parse_instructions()
 
-        # Setting props from DOM to Component
+        # If this is root comp (no parent) then set props from DOM attributes
         # Grab props from root domnode and use them to initialize component's
         # props
-        pprint("Parsing properties values from DOM to Component")
-        for attr in self.elem.attributes:
-            try:
-                name, value = attr.name, attr.value
-                if name not in ['cid', 'rd']:
+        if self.parent is None:
+            pprint("Parsing properties values from DOM to Component")
+            for attr in self.elem.attributes:
+                try:
+                    name, value = attr.name, attr.value
+                    if name not in ['cid', 'rd']:
 
-                    if match_search(value, REGEX_BRACKETS) != -1:
-                        setattr(self, name, eval(value[1:-1]))
-                    else:
-                        setattr(self, name, value)
-            except:
-                pass
+                        if match_search(value, REGEX_BRACKETS) != -1:
+                            setattr(self, name, eval(value[1:-1]))
+                        else:
+                            setattr(self, name, value)
+                except:
+                    pass
 
 
         # mark as mounted
@@ -369,12 +370,18 @@ class Component(ObjectWithProperties):
                     pprint("CREATE custom component, named", nodename)
                     try:
                         comp = Register.get_component_class(nodename)()
-                        # Set props to DOM
+                        # Set Comp's props initial values  from DOM template
                         for attr in attributes:
-                            name, value = attr[0:2]
-                            # TODO binding if there are props2bind
-                            comp._dom_newattr(name, value)
-
+                            name, value, type_ = attr[0:3]
+                            if name == "cid":
+                                continue
+                            if (type_ == DYN_ATTR):
+                                expression = value[2:-2]
+                                props2bind = attr[3]
+                                comp.update_with_expression(name, expression, self.context, comp, props2bind)
+                            else:
+                                setattr(comp, name, value)
+                        # TODO We don't set domnode attributes based on template, only comp,, should we?
                         comp.mount()
                     except Exception as e:
                         pprint("Couldnt add component ", nodename, e)
@@ -592,7 +599,10 @@ try:
 
     def match(text, regex):
         jstext = JSConstructor(window.String)(text)
-        return jstext.match(regex)
+        m = jstext.match(regex)
+        if m is None:
+            return []
+        return m
 
     def match_replace(text, regex, replace):
         jstext = JSConstructor(window.String)(text)
@@ -626,7 +636,8 @@ class Register(object):
 
     @classmethod
     def add(cls, comp_cls):
-        cls.reg.append(comp_cls)
+        if comp_cls not in cls.reg:
+            cls.reg.append(comp_cls)
 
     @classmethod
     def get_component_class(cls, cls_name):

@@ -1,5 +1,5 @@
 import tester as unittest
-from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor, BrowserDOMRender
+from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor, BrowserDOMRender, Register
 from browser import document
 
 class ObjTest(ObjectWithProperties):
@@ -155,12 +155,37 @@ class TestComponent(unittest.TestCase):
         self.assertEqual(obj._rendered_style, expected)
         self.assertEqual(obj._style_comp.html, expected)
 
+    def test_set_subcomp_props_from_templatedom(self):
+        """Tests setting initial values to Component's properties based on
+        attributes defined in DOM template"""
+
+        obj = MyComponent()
+        template ="""<comp><SubComponent cid="sub" a="{1}" b="{self.a+2}"></SubComponent></comp>"""
+        obj.instructions = self.tp.parse(template)
+        obj.mount()
+
+        obj2 = obj.get('sub')
+        self.assertEqual(obj2.a, 1)
+        self.assertEqual(obj2.b, 2) #obj.a is 0
+        obj.a = 2
+        self.assertEqual(obj2.b, 4)
+ 
 class MyComponent(Component):
     template="<MyComponent></MyComponent>"
     tag = 'MyComponent'
     a = Property(0)
     b = Property(2)
+
+class SubComponent(Component):
+    template="<SubComponent></SubComponent>"
+    tag = 'SubComponent'
+    a = Property(0)
+    b = Property(2)
     
+
+Register.add(SubComponent)
+Register.add(MyComponent)
+   
 
 BrowserDOMRender.direct = True
 TESTS = (TestProperties, TestComponent)
