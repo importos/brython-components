@@ -282,8 +282,6 @@ class Component(ObjectWithProperties):
         callback = getattr(self, "on_html")
         self.bind("html", callback)
 
-        callback = getattr(self, "on_is_mounted")
-        self.bind("is_mounted", callback)
 
         try:
             callback = getattr(self, "on_style")
@@ -301,6 +299,9 @@ class Component(ObjectWithProperties):
         """
         Process the Component (and its children): Parses instructions, binds properties and renders the DOMNode in the site.
         """
+        if self.elem is None:
+            tag = self.tag if self.rendertag is None else self.rendertag
+            self.elem = self._create_domelem(tag)
         self._dom_newattr("id", "%s_%s" % (self.__class__.__name__, self.iid))
 
         # Create style comp and add it
@@ -333,6 +334,7 @@ class Component(ObjectWithProperties):
 
         # mark as mounted
         self._mark_as_mounted()
+        self.on_mount()
         return self
 
     def _mount_style(self):
@@ -459,11 +461,12 @@ class Component(ObjectWithProperties):
         if self.is_mounted:
             self._mount_style()
 
-    def on_is_mounted(self, value, instance):
-        self.on_mount()
 
     def on_mount(self):
         pass
+    
+    def on_unmount(self):
+        self.is_mounted = False
 
     def render(self, before=None, after=None):
         return self.dom_renderer.render(self, before, after)
@@ -488,8 +491,11 @@ class Component(ObjectWithProperties):
         return self.ids[cid]
 
     def remove(self, component):
+        # unmount DOM first
+        component.unmount()
+
         # Remove component
-        del self.children[self.children.index(component)]
+        self.children.remove(component)
         # Remove cid association
         comp_k = None
         for k in self.ids:
@@ -498,19 +504,20 @@ class Component(ObjectWithProperties):
                 break
         if comp_k is not None:
             del self.ids[comp_k]
-        # unmount component
-        component.unmount()
+        #TODO unbind
 
     def remove_all(self):
-        for c in self.children:
-            if c is not self._style_comp:
-                c.unmount()
-        self.children = []
+        torem = [c for c in self.children if c is not self._style_comp]
+        for c in torem:
+            self.remove(c)
         self.ids = {}
 
     def unmount(self):
         self.parent.elem.removeChild(self.elem)
         del self.elem
+        self.elem = None
+        # TODO Unmount binds to DOM and from DOM
+        self.on_unmount()
 
     def add_html(self, html):
         """Simplifies adding HTML elements to a component"""
