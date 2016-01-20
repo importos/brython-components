@@ -10,7 +10,7 @@ Components for Brython like React, RiotJS and similar. But using Python!
 
 brython code:
 ```
-from components import Register, Component, Property, init()
+from components import Register, Component, Property, init
 from browser import alert
 
 class MyComponent(Component):
@@ -23,7 +23,7 @@ class MyComponent(Component):
     alert("Hello %s"%(self.get('name').elem.value))
 
 Register.add(MyComponent)
-init() # Renders registered Components. Call this only once
+init() # Renders registered components in DOM
 ```
 
 html:
