@@ -183,7 +183,10 @@ class ObjectWithProperties(object):
         cbackp = self.chain_prop_cback(property_name, expression, context, obj)
 
         for prop in props2bind:
-            context_self.bind(prop, cbackp)
+            try:
+                context_self.bind(prop, cbackp)
+            except:
+                pass
 
         # Call manually to set an initial value
         self._chain_prop(None, self, property_name, expression, context, obj)
@@ -724,7 +727,7 @@ class TemplateProcessor(object):
                 for txt in texts:
                     if(match_search(txt, REGEX_BRACKETS) != -1):
                         # Dynamic node
-                        props2bind = [x[5:] for x in match(txt, REGEX_SELF) if '(' not in x]
+                        props2bind = [x[5:] for x in match(txt, REGEX_SELF)]
                         compiled_expr = self._compile_expr(txt[1:-1])
 
                         d = [ELEMENT, DYNODE, compiled_expr, props2bind]
@@ -743,7 +746,7 @@ class TemplateProcessor(object):
                     name, value = attr.name, attr.value
                     if(match_search(value, REGEX_BRACKETS) != -1):
                         if name not in DOMEVENTS:
-                            props2bind = [x[5:] for x in match(value, REGEX_SELF) if '(' not in x]
+                            props2bind = [x[5:] for x in match(value, REGEX_SELF)]
                             compiled_expr = self._compile_expr(value[2:-2])
                             attributes.append((name, compiled_expr, DYN_ATTR, props2bind))
                         else:
