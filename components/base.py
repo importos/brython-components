@@ -304,7 +304,8 @@ class Component(ObjectWithProperties):
         self._dom_newattr("id", "%s_%s" % (self.__class__.__name__, self.iid))
 
         # Create style comp and add it
-        self._mount_style()
+        if len(self.style):
+            self._mount_style()
 
         pprint("Mounting", self, "Instructions",
                self.instructions, "Context: ", context)
