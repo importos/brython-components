@@ -5,17 +5,18 @@
        </head>
 
     <body onload="brython();">
-
         <script type="text/python">
-        from browser import document, alert, window, html
-        from components import init, Register, Component, Property
+        from components import Register, Component, Property
+        from browser import alert
 
         class MyComponent(Component):
-            template="<MyComponent>{self.msg}<br/><button data='{self.data}' onclick='{self.hello()}'>Button</button></MyComponent>"
-            msg = Property('Hello World')
-            data = Property('Data value')
+            template = """<MyComponent>
+            <input cid='name' placeholder='Type your name' type='text'/>
+            <button onclick='{self.hello()}'>Click me</button>
+            </MyComponent>"""
+          
             def hello(self):
-                alert(self.msg)
+                alert("Hello %s"%(self.get('name').elem.value))
 
         Register.add(MyComponent)
         init()
