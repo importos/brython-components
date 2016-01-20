@@ -1,10 +1,13 @@
 import tester as unittest
-from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor, BrowserDOMRender, Register
+from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor, BrowserDOMRender, Register, compile_expr
 from browser import document
 
 class ObjTest(ObjectWithProperties):
     a = Property(0)
     b = Property(0)
+
+    def other_func(self):
+        return self.a * 10
 
 class TestProperties(unittest.TestCase):
     
@@ -31,20 +34,17 @@ class TestProperties(unittest.TestCase):
         obj.a = 1
 
         self.assertEqual(result[0], 1)
-    
+
     def test_update_with_expression(self):
         obj1 = ObjTest()
         obj2 = ObjTest()
-        
         expr = 'self.a + self.b'
         context = {'self': obj1}
-
-        obj2.update_with_expression('a', expr, context)
-
+        exprc = compile_expr(expr)
+        obj2.update_with_expression('a', exprc, context, props2bind=('a', 'b'))
         obj1.a = 10
         # At this point obj2.a = obj1.a + obj2.b = 10 + 0 = 10
         self.assertEqual(obj2.a, 10)
-        
         obj1.b = 5
         # At this point obj2.a = obj1.a + obj2.b = 10 + 5 = 15
         self.assertEqual(obj2.a, 15)
@@ -93,8 +93,8 @@ class TestComponent(unittest.TestCase):
         self.assertEqual(len(obj.children), 0)
 
     def test_parse_template(self):
-        template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
-        expected = [(3, 'Text node'), [1, 'LI', [('a', '1', 1), ('b', '|{self.b}|', 3, ['b'])], [[1, 'DYNODE', 'self.a', ['a']]]]]
+        template ="""<comp>Text node<li a='1' b='1'>2</li></comp>"""
+        expected = [(3, 'Text node'), [1, 'LI', [('a', '1', 1), ('b', '1', 1)], [(3, '2')]]]
         tp = TemplateProcessor()
         result = tp.parse(template)
         self.assertEqual(result, expected)
@@ -131,7 +131,6 @@ class TestComponent(unittest.TestCase):
         self.assertEqual(dynode.elem.html, "%s"%(obj.a)) # should be 0
         obj.a = 2
         self.assertEqual(dynode.elem.html, "%s"%(obj.a)) # should be 2
-
     def test_dom_attr_change(self):
         obj = MyComponent()
         template ="""<comp><li a='{self.a}'></li></comp>"""
@@ -169,7 +168,7 @@ class TestComponent(unittest.TestCase):
         self.assertEqual(obj2.b, 2) #obj.a is 0
         obj.a = 2
         self.assertEqual(obj2.b, 4)
- 
+
 class MyComponent(Component):
     template="<MyComponent></MyComponent>"
     tag = 'MyComponent'

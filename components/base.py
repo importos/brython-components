@@ -140,11 +140,15 @@ class ObjectWithProperties(object):
 
     cnt = 0
     iid = None
+    _mro_idx = 1 # Position of ObjectWithProperties class in __mro__,
+                 # For Component _mro_idx = 2 TODO This can be problematic
+                 # if _mro_ changes with inheritance. Maybe _mro_idx can be calculated
 
     def __init__(self):
         self.cnt = ObjectWithProperties.cnt
         self.iid = self._calc_iid()
         ObjectWithProperties.cnt += 1
+        self._mro_idx = 1 
 
     def _calc_iid(self):
         # return hex(id(self) + self.cnt)
@@ -178,13 +182,8 @@ class ObjectWithProperties(object):
         context_self = context['self']
         cbackp = self.chain_prop_cback(property_name, expression, context, obj)
 
-        if props2bind is None:
-            for var in match(expression, REGEX_SELF):
-                lastprop = var[5:]
-                context_self.bind(lastprop, cbackp)
-        else:
-            for prop in props2bind:
-                context_self.bind(prop, cbackp)
+        for prop in props2bind:
+            context_self.bind(prop, cbackp)
 
         # Call manually to set an initial value
         self._chain_prop(None, self, property_name, expression, context, obj)
@@ -196,12 +195,14 @@ class ObjectWithProperties(object):
 
     def _chain_prop(self, value, instance, propname, expression, context, obj):
         # assign
-        v = eval(expression, context)  # TODO security?
+        v = expression(context['self'])
         setattr(obj, propname, v)
 
     def force_change(self, propname):
         getattr(self.__class__, propname).force_change(self)
 
+    def _get_attr(self, attrname):
+        return getattr(self, attrname)
 
 class DOMRender(object):
     """Class used to render DOM"""
@@ -263,7 +264,7 @@ class Component(ObjectWithProperties):
         super(Component, self).__init__()
         self.children = []
         self.ids = {}
-
+        self._mro_idx = 2
         # Bind on_property of instance for each prop
         for propname in self._prop_list:
             try:
@@ -377,7 +378,7 @@ class Component(ObjectWithProperties):
                             if name == "cid":
                                 continue
                             if (type_ == DYN_ATTR):
-                                expression = value[2:-2]
+                                expression = value
                                 props2bind = attr[3]
                                 comp.update_with_expression(name, expression, self.context, comp, props2bind)
                             else:
@@ -402,11 +403,9 @@ class Component(ObjectWithProperties):
 
                         if (type_ == DYN_ATTR):
                             # Dyn
-                            pprint("setting dyn attr", name, value)
-                            expression = value[2:-2]  # value= "|{expression}|"
-                            # TODO who is self? Analyze more.
 
                             # Check if is event or normal attribute
+                            expression = value
                             if name not in DOMEVENTS:
                                 comp._dom_newattr(name, '')
                                 props2bind = attr[3]
@@ -414,8 +413,6 @@ class Component(ObjectWithProperties):
                                     name, expression, self.context, comp.elem, props2bind)
                             else:
                                 eventname = name[2:]
-                                pprint(
-                                    "BINDING DOM Event", eventname, " to expression", expression)
                                 comp.elem.bind(
                                     eventname, context_self.domevent_callback(expression, self.context))
 
@@ -593,6 +590,7 @@ try:
     from browser import document, alert, window, html, console
     from javascript import JSConstructor
     DP = JSConstructor(window.DOMParser)()
+    NEW_FUNC = JSConstructor(window.Function)
     REGEX_SELF = JSConstructor(window.RegExp)("self\.[A-Za-z0-9_]{1,}", 'g')
     REGEX_BRACKETS = JSConstructor(window.RegExp)("\{(.*?)\}", 'g')
 
@@ -615,7 +613,7 @@ except:
 
     import re
 
-    REGEX_SELF = re.compile("self\.[A-Za-z0-9_]{1,}")
+    REGEX_SELF = re.compile("self\.[A-z0-9_]{1,}")
     REGEX_BRACKETS = re.compile("\{(.*?)\}")
 
     def match(text, regex):
@@ -726,8 +724,10 @@ class TemplateProcessor(object):
                 for txt in texts:
                     if(match_search(txt, REGEX_BRACKETS) != -1):
                         # Dynamic node
-                        props2bind = [x[5:] for x in match(txt, REGEX_SELF)]
-                        d = [ELEMENT, DYNODE, txt[1:-1], props2bind]
+                        props2bind = [x[5:] for x in match(txt, REGEX_SELF) if '(' not in x]
+                        compiled_expr = self._compile_expr(txt[1:-1])
+
+                        d = [ELEMENT, DYNODE, compiled_expr, props2bind]
                         instructions.append(d)
                     else:
                         # Text node
@@ -742,8 +742,13 @@ class TemplateProcessor(object):
                 for attr in node.attributes:
                     name, value = attr.name, attr.value
                     if(match_search(value, REGEX_BRACKETS) != -1):
-                        props2bind = [x[5:] for x in match(value, REGEX_SELF)]
-                        attributes.append((name, value, DYN_ATTR, props2bind))
+                        if name not in DOMEVENTS:
+                            props2bind = [x[5:] for x in match(value, REGEX_SELF) if '(' not in x]
+                            compiled_expr = self._compile_expr(value[2:-2])
+                            attributes.append((name, compiled_expr, DYN_ATTR, props2bind))
+                        else:
+                            #linked DOM event to Comp method
+                            attributes.append((name, value[2:-2], DYN_ATTR, None))
                     else:
                         if name not in DOMEVENTS:
                             attributes.append((name, value, NORMAL_ATTR))
@@ -756,3 +761,14 @@ class TemplateProcessor(object):
 
         pprint("Parsing template Ended.")
         return instructions
+
+    def _compile_expr(self, expression):
+        return compile_expr(expression)
+
+def compile_expr(expression):
+    for x in match(expression, REGEX_SELF):
+        rstr = "obj._get_attr(self, '%s')"%(x[5:])
+        expression = expression.replace(x,rstr )
+    body = 'var obj = self.__class__.__mro__[self._mro_idx]; window.myobj=obj; return %s;'%(expression)
+    thefunc = NEW_FUNC(['self'], body)
+    return thefunc
