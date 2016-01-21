@@ -212,14 +212,14 @@ class ObjectWithProperties(object):
         else:
             obj = RefMap.add(obj)
 
-        context_self = RefMap.get(context['self'])
         cbackp = self.chain_prop_cback(property_name, expression, context, obj)
 
         for prop in props2bind:
             try:
-                context_self.bind(prop, cbackp)
-            except:
-                pass
+                objname, propname = prop
+                RefMap.get(context[objname]).bind(propname, cbackp)
+            except Exception as e:
+                print("error binding", e)
 
         # Call manually to set an initial value
         self._chain_prop(None, self, property_name, expression, context, obj)
@@ -231,7 +231,12 @@ class ObjectWithProperties(object):
 
     def _chain_prop(self, value, instance, propname, expression, context, objref):
         # assign
-        v = expression(RefMap.get(context['self']))
+        context_root= RefMap.get(context['root'])
+        context_parent= RefMap.get(context['parent'])
+        context_self = RefMap.get(context['self'])
+        context_this= RefMap.get(context['this'])
+        v = expression(context_root, context_parent, context_self, context_this)
+
         setattr(RefMap.get(objref), propname, v)
 
     def force_change(self, propname):
@@ -328,7 +333,13 @@ class Component(ObjectWithProperties):
         else:
             self.elem = domnode
 
-    def mount(self, context=None):
+    def __repr__(self):
+        return "%s tag: %s id: %s iid: %s"%(self.__class__.__name__, self.tag, id(self), self.iid)
+
+    def set_context(self, root):
+        self.context = {"self": RefMap.add(self), "this": RefMap.add(self.elem), "root": RefMap.add(root), "parent": RefMap.add(self.parent)}
+
+    def mount(self):
         """
         Process the Component (and its children): Parses instructions, binds properties and renders the DOMNode in the site.
         """
@@ -337,14 +348,16 @@ class Component(ObjectWithProperties):
             self.elem = self._create_domelem(tag)
         self._dom_newattr("id", "%s_%s" % (self.__class__.__name__, self.iid))
 
+        self.set_context(self.root)
+
         # Create style comp and add it
         if len(self.style):
             self._mount_style()
 
         pprint("Mounting", self, "Instructions",
-               self.instructions, "Context: ", context)
-        self.context = {
-            "self": RefMap.get_ref(self)} if context is None else context
+               self.instructions, "Context: ", self.context)
+
+ 
         self.parse_instructions()
 
         # If this is root comp (no parent) then set props from DOM attributes
@@ -388,7 +401,7 @@ class Component(ObjectWithProperties):
     def parse_instructions(self):
         parentcomp = self
         instruction_set = self.instructions
-        context_self = RefMap.get(self.context['self'])
+        context_root = RefMap.get(self.context['root'])
 
         for instruction in instruction_set:
             type_ = instruction[0]
@@ -410,7 +423,14 @@ class Component(ObjectWithProperties):
                     try:
                         comp = Register.get_component_class(nodename)()
                         # TODO We don't set domnode attributes based on template, only comp,, should we?
+                        comp.root = comp #Custom comps are their own root
+                        comp.parent = self
+
                         comp.mount()
+
+                        # For attributes from DOM template to Comp use normal root for context
+                        comp.set_context(root=self.root)
+
                         # Once mounted Set Comp's props initial values  from DOM template
                         for attr in attributes:
                             name, value, type_ = attr[0:3]
@@ -419,9 +439,13 @@ class Component(ObjectWithProperties):
                             if (type_ == DYN_ATTR):
                                 expression = value
                                 props2bind = attr[3]
-                                comp.update_with_expression(name, expression, self.context, comp, props2bind)
+                                comp.update_with_expression(name, expression, comp.context, comp, props2bind)
                             else:
                                 setattr(comp, name, value)
+
+                        #Restore context
+                        comp.set_context(root=comp.root)
+
                     except Exception as e:
                         pprint("Couldnt add component ", nodename, e)
 
@@ -431,7 +455,7 @@ class Component(ObjectWithProperties):
                     props2bind = instruction[3]
                     # Bind all attributes in expression
                     comp.update_with_expression(
-                        'html', expression, self.context, comp, props2bind)
+                        'html', expression, comp.context, comp, props2bind)
                     comp.is_mounted = True
                 else:  # Components of classic HTML nodes
                     comp = self.create_component(nodename)
@@ -449,11 +473,11 @@ class Component(ObjectWithProperties):
                                 comp._dom_newattr(name, '')
                                 props2bind = attr[3]
                                 comp.update_with_expression(
-                                    name, expression, self.context, comp.elem, props2bind)
+                                    name, expression, comp.context, comp.elem, props2bind)
                             else:
                                 eventname = name[2:]
                                 comp.elem.bind(
-                                    eventname, context_self.domevent_callback(expression, self.context))
+                                    eventname, comp.domevent_callback(expression, comp.context))
 
                         else:
                             # Normal attr
@@ -461,18 +485,20 @@ class Component(ObjectWithProperties):
 
                     child_instructions = instruction[3]
                     comp.instructions = child_instructions
-                    comp.mount(context=self.context)
+                    comp.mount()
             pprint("Adding COMP", comp, comp.tag)
 
             # Add comp to cid dict for quick retrieval
-            context_self._add_cid(comp, cid)
+            context_root._add_cid(comp, cid)
             parentcomp.add(comp)
 
     def create_component(self, tag, text=''):
 
         dom_elem = self._create_domelem(tag, text)
         c = HTMLComp(tag, dom_elem)
+        c.parent = self
         c.root = self.root
+        c.set_context(c.root)
         return c
 
     def _create_domelem(self, tag, text=''):
@@ -510,7 +536,7 @@ class Component(ObjectWithProperties):
         comp.parent = self
         # Sometimes comps are not mounted, we should mount them before render
         if not comp.is_mounted:
-            comp.root = self.root
+            comp.root = self.root if isinstance(comp, HTMLComp) else comp #Custom comps are their own root
             comp.mount()
 
         comp.render(before, after)
@@ -572,8 +598,8 @@ class Component(ObjectWithProperties):
 
     def _domevent_callback(self, event, expression, context):
         pprint("EVENT", event, "expression", expression)
-        context_self = RefMap.get(context['self'])
-        eval(expression, {'self': context_self})  # TODO security?
+        real_context = {'self': RefMap.get(context['self']),'parent': RefMap.get(context['parent']),'root':RefMap.get(context['root']),'this': RefMap.get(context['this'])}
+        eval(expression, real_context)  # TODO security?
 
 
 class HTMLComp(Component):
@@ -589,8 +615,7 @@ class HTMLComp(Component):
         self.elem.innerHTML = value
 
     def mount(self, context=None):
-        self.context = {
-            "self": RefMap.get_ref(self)} if context is None else context
+        self.context = {"self": RefMap.add(self), "this": RefMap.add(self.elem), "root": RefMap.add(self.root), "parent": RefMap.add(self.parent)}
         self.parse_instructions()
         # mark as mounted
         self._mark_as_mounted()
@@ -638,7 +663,7 @@ try:
     from javascript import JSConstructor
     DP = JSConstructor(window.DOMParser)()
     NEW_FUNC = JSConstructor(window.Function)
-    REGEX_SELF = JSConstructor(window.RegExp)("self\.[A-Za-z0-9_]{1,}", 'g')
+    REGEX_SELF = JSConstructor(window.RegExp)("(self|parent|root)\.[A-Za-z0-9_]{1,}", 'g')
     REGEX_BRACKETS = JSConstructor(window.RegExp)("\{(.*?)\}", 'g')
     window.RefMap = RefMap.ref
 
@@ -772,7 +797,7 @@ class TemplateProcessor(object):
                 for txt in texts:
                     if(match_search(txt, REGEX_BRACKETS) != -1):
                         # Dynamic node
-                        props2bind = [x[5:] for x in match(txt, REGEX_SELF)]
+                        props2bind = get_props2bind(txt)
                         compiled_expr = self._compile_expr(txt[1:-1])
 
                         d = [ELEMENT, DYNODE, compiled_expr, props2bind]
@@ -791,7 +816,7 @@ class TemplateProcessor(object):
                     name, value = attr.name, attr.value
                     if(match_search(value, REGEX_BRACKETS) != -1):
                         if name not in DOMEVENTS:
-                            props2bind = [x[5:] for x in match(value, REGEX_SELF)]
+                            props2bind = get_props2bind(value)
                             compiled_expr = self._compile_expr(value[2:-2])
                             attributes.append((name, compiled_expr, DYN_ATTR, props2bind))
                         else:
@@ -813,11 +838,15 @@ class TemplateProcessor(object):
     def _compile_expr(self, expression):
         return compile_expr(expression)
 
+def get_props2bind(expression):
+    ret = [x.split('.')[0:2] for x in match(expression, REGEX_SELF)]
+    return ret
+
 def compile_expr(expression):
-    thefunc = "def func(self):\n    return %s" %(expression)
+    thefunc = "def func(root, parent, self, this):\n    return %s" %(expression)
     try:
         exec(thefunc)
     except:
-        raise Exception("Cannot compile expression ", expression)
+        raise Exception("Cannot compile expression %s"%(expression))
     else:
         return func #Some IDEs will say func is not defined, but it is defined in exec in this scope

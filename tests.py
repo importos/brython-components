@@ -1,5 +1,5 @@
 import tester as unittest
-from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor, BrowserDOMRender, Register, compile_expr, RefMap
+from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor, BrowserDOMRender, Register, compile_expr, RefMap, get_props2bind
 from browser import document
 
 class ObjTest(ObjectWithProperties):
@@ -35,19 +35,26 @@ class TestProperties(unittest.TestCase):
 
         self.assertEqual(result[0], 1)
 
-    def test_update_with_expression(self):
-        obj1 = ObjTest()
-        obj2 = ObjTest()
-        expr = 'self.a + self.b'
-        context = {'self': RefMap.get_ref(obj1)}
+
+    def test_update_with_expression_self_parent_root(self):
+        obj_self = ObjTest()
+        obj_parent = ObjTest()
+        obj_root = ObjTest()
+
+        expr = 'self.b + parent.a + root.a + 10' #Since we're updating obj_self.a we don't use self.a in expr to avoid infinite recursion
+        context = {'self': RefMap.get_ref(obj_self), 'parent': RefMap.get_ref(obj_parent),'root': RefMap.get_ref(obj_root),'this': RefMap.add(None)}
         exprc = compile_expr(expr)
-        obj2.update_with_expression('a', exprc, context, props2bind=('a', 'b'))
-        obj1.a = 10
-        # At this point obj2.a = obj1.a + obj2.b = 10 + 0 = 10
-        self.assertEqual(obj2.a, 10)
-        obj1.b = 5
-        # At this point obj2.a = obj1.a + obj2.b = 10 + 5 = 15
-        self.assertEqual(obj2.a, 15)
+
+        props2bind = get_props2bind(expr)
+        obj_self.update_with_expression('a', exprc, context,
+                props2bind=props2bind)
+        
+        obj_parent.a = 1
+        self.assertEqual(obj_self.a, 11)
+        obj_root.a = 2
+        self.assertEqual(obj_self.a, 13)
+        obj_self.b = 3
+        self.assertEqual(obj_self.a, 16)
 
     def test_force_change(self):
         obj = ObjTest()
@@ -62,6 +69,41 @@ class TestProperties(unittest.TestCase):
 class TestComponent(unittest.TestCase):
     tp = TemplateProcessor()
 
+    def test_comp_context(self):
+        Register.add(SubComponent)
+        obj = MyComponent()
+        obj.root = obj
+        template ="""<comp><li><a><SubComponent></SubComponent></a></li></comp>"""
+        obj.instructions = self.tp.parse(template)
+
+        obj.mount()
+        comp_li = obj.children[0]
+        comp_a = comp_li.children[0]
+        comp_sub = comp_a.children[0]
+        self.assertEqual(RefMap.get(comp_li.context['self']), comp_li)
+        self.assertEqual(RefMap.get(comp_li.context['parent']), obj)
+        self.assertEqual(RefMap.get(comp_li.context['root']), obj)
+        
+        self.assertEqual(comp_li.root, obj)
+        self.assertEqual(comp_li.parent, obj)
+
+        self.assertEqual(RefMap.get(comp_a.context['self']), comp_a)
+        self.assertEqual(RefMap.get(comp_a.context['parent']), comp_li)
+        self.assertEqual(RefMap.get(comp_a.context['root']), obj)
+
+        self.assertEqual(comp_a.root, obj)
+        self.assertEqual(comp_a.parent, comp_li)
+
+
+        self.assertEqual(RefMap.get(comp_sub.context['parent']), comp_a)
+        self.assertEqual(RefMap.get(comp_sub.context['root']), comp_sub)
+
+        comp_sub2 = SubComponent()
+        obj.add(comp_sub2)
+        self.assertEqual(RefMap.get(comp_sub2.context['parent']), obj)
+        self.assertEqual(RefMap.get(comp_sub2.context['root']), comp_sub2)
+
+
     def test_htmlcomp_dom_creation(self):
         obj = HTMLComp('LI')
         self.assertEqual('LI' , obj.elem.nodeName)
@@ -75,9 +117,9 @@ class TestComponent(unittest.TestCase):
         c = HTMLComp('LI')
         obj.add(c)
         self.assertEqual(obj.children[0], c)
-
     def test_comp_add_html(self):
         obj = MyComponent()
+        obj.root = obj
         obj.mount() # Needed to add self.context
         obj.add_html("<li><b>Test</b></li>")
         lastc = obj.children[-1]
@@ -86,6 +128,7 @@ class TestComponent(unittest.TestCase):
 
     def test_comp_remove(self):
         obj = MyComponent()
+        obj.root = obj
         c = HTMLComp('LI')
         obj.add(c)
         obj.remove(c)
@@ -100,7 +143,8 @@ class TestComponent(unittest.TestCase):
 
     def test_parse_instructions(self):
         obj = MyComponent()
-        template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
+        obj.root = obj
+        template ="""<comp>Text node<li a='1' b='{root.b}'>{root.a}</li></comp>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
         li_comp = obj.children[1]
@@ -114,7 +158,8 @@ class TestComponent(unittest.TestCase):
 
     def test_render(self):
         obj = MyComponent()
-        template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
+        obj.root = obj
+        template ="""<comp>Text node<li a='1' b='{root.b}'>{root.a}</li></comp>"""
         expected = """Text node<li a="1" b="2" rd="1"><dynode>0</dynode></li>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
@@ -122,7 +167,8 @@ class TestComponent(unittest.TestCase):
 
     def test_dynode_change(self):
         obj = MyComponent()
-        template ="""<comp>{self.a}</comp>"""
+        obj.root = obj
+        template ="""<comp>{root.a}</comp>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
         
@@ -133,7 +179,8 @@ class TestComponent(unittest.TestCase):
 
     def test_dom_attr_change(self):
         obj = MyComponent()
-        template ="""<comp><li a='{self.a}'></li></comp>"""
+        obj.root = obj
+        template ="""<comp><li a='{root.a}'></li></comp>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
 
@@ -144,6 +191,7 @@ class TestComponent(unittest.TestCase):
         
     def test_style_scope(self):
         obj = MyComponent()
+        obj.root = obj
         template ="<comp><b>Hello</b></comp>"
         obj.instructions = self.tp.parse(template)
         obj.style = """:host {color: red;}"""
@@ -159,7 +207,8 @@ class TestComponent(unittest.TestCase):
         attributes defined in DOM template"""
 
         obj = MyComponent()
-        template ="""<comp><SubComponent cid="sub" a="{1}" b="{self.a+2}"></SubComponent></comp>"""
+        obj.root = obj
+        template ="""<comp><SubComponent cid="sub" a="{1}" b="{root.a+2}"></SubComponent></comp>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
 
