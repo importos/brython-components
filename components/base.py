@@ -814,9 +814,10 @@ class TemplateProcessor(object):
         return compile_expr(expression)
 
 def compile_expr(expression):
-    for x in match(expression, REGEX_SELF):
-        rstr = "obj._get_attr(self, '%s')"%(x[5:])
-        expression = expression.replace(x,rstr )
-    body = 'var obj = self.__class__.__mro__[self._mro_idx]; window.myobj=obj; return %s;'%(expression)
-    thefunc = NEW_FUNC(['self'], body)
-    return thefunc
+    thefunc = "def func(self):\n    return %s" %(expression)
+    try:
+        exec(thefunc)
+    except:
+        raise Exception("Cannot compile expression ", expression)
+    else:
+        return func #Some IDEs will say func is not defined, but it is defined in exec in this scope
