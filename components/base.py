@@ -171,14 +171,9 @@ class ObjectWithProperties(object):
 
     def __init__(self):
         self.cnt = ObjectWithProperties.cnt
-        self.iid = self._calc_iid()
+        self.iid = self.cnt
         ObjectWithProperties.cnt += 1
-
         RefMap.add(self)
-
-    def _calc_iid(self):
-        # return hex(id(self) + self.cnt)
-        return self.cnt
 
     def bind(self, propname, callback):
         """Bind instance property to callback"""
@@ -264,64 +259,24 @@ class BrowserDOMRender(DOMRender):
         else:
             comp.parent.elem <= comp.elem
 
+class BaseComponent(ObjectWithProperties):
+    """Base Component class, core logic. Use Component for creating custom comps"""
 
-class Component(ObjectWithProperties):
-
-    """
-    Base Component class. All components inherit from it.
-    Every Component is linked with a DOMNode element (component.elem) which is present
-    in the site's HTML.
-    """
     tag = None  # Tag used to identify components in DOM. If None class name is used.
     rendertag = None  # Tag used to render the component in DOM
-    template = ""  # Template used to build the internals of the component
     # Template string is parsed and compiled into a set of instructions
     instructions = []
-    elem = Property(None)  # DOMNode
-    html = Property(None)
     children = None  # Children Components
-    # Ids dict to quickly access child comps by their cid
-    # (comp.get('child_cid'))
-    ids = {}
     parent = None  # Parent Component.
     # Root component (The first component that initiated the mount)
     root = None
     is_mounted = Property(False)
-    _prop_list = []
-
-    style = Property("")
-    _rendered_style = Property("")
-    _style_comp = None
-
     dom_renderer = BrowserDOMRender()
-
-    cls_initialized = False
-
+    elem = None  # DOMNode
+    
     def __init__(self, domnode=None):
-        super(Component, self).__init__()
+        super(BaseComponent, self).__init__()
         self.children = []
-        self.ids = {}
-        # Bind on_property of instance for each prop
-        for propname in self._prop_list:
-            try:
-                callback = getattr(self, "on_%s" % (propname))
-                self.bind(propname, callback)
-            except:
-                pass
-        # Default callbacks
-        callback = getattr(self, "on_elem")
-        self.bind("elem", callback)
-
-        callback = getattr(self, "on_html")
-        self.bind("html", callback)
-
-
-        try:
-            callback = getattr(self, "on_style")
-            self.bind("style", callback) #bind will fail if self.style is not Property
-        except:
-            pass 
-
         if domnode == None:
             tag = self.tag if self.rendertag is None else self.rendertag
             self.elem = self._create_domelem(tag)
@@ -333,65 +288,6 @@ class Component(ObjectWithProperties):
 
     def set_context(self, root):
         self.context = {"self": RefMap.add(self), "this": RefMap.add(self.elem), "root": RefMap.add(root), "parent": RefMap.add(self.parent)}
-
-    def mount(self):
-        """
-        Process the Component (and its children): Parses instructions, binds properties and renders the DOMNode in the site.
-        """
-        if self.elem is None: # Create DOM elem if needed
-            tag = self.tag if self.rendertag is None else self.rendertag
-            self.elem = self._create_domelem(tag)
-        self._dom_newattr("id", "%s_%s" % (self.__class__.__name__, self.iid))
-
-        self.set_context(self.root)
-
-        # Create style comp and add it
-        if len(self.style):
-            self._mount_style()
-
-        pprint("Mounting", self, "Instructions",
-               self.instructions, "Context: ", self.context)
-
- 
-        self.parse_instructions()
-
-        # If this is root comp (no parent) then set props from DOM attributes
-        # Grab props from root domnode and use them to initialize component's
-        # props
-        if self.parent is None:
-            pprint("Parsing properties values from DOM to Component")
-            for attr in self.elem.attributes:
-                try:
-                    name, value = attr.name, attr.value
-                    if name not in ['cid', 'rd']:
-
-                        if match_search(value, REGEX_BRACKETS) != -1:
-                            setattr(self, name, eval(value[1:-1]))
-                        else:
-                            setattr(self, name, value)
-                except:
-                    pass
-
-
-        # mark as mounted
-        self._mark_as_mounted()
-        self.on_mount()
-        return self
-
-    def _mount_style(self):
-        self._rendered_style = self.style.replace(
-            ":host", "#%s" % (self.elem.id))
-        if self._style_comp is None:
-            self._style_comp = HTMLComp(tag='style')
-            self.add(self._style_comp)
-        self._style_comp.html = self._rendered_style
-
-    def _mark_as_mounted(self):
-        self._dom_newattr("rd", "1")
-        self.is_mounted = True
-
-    def _dom_newattr(self, name, value):
-        self.elem.setAttribute(name, value)
 
     def parse_instructions(self):
         parentcomp = self
@@ -505,22 +401,20 @@ class Component(ObjectWithProperties):
             dom_elem = window.__BRYTHON__.DOMNode(dom)
         return dom_elem
 
-    def on_elem(self, value, instance):
-        pprint(("dom element", value))
 
-    def on_html(self, value, instance):
-        pprint(("html element", value))
+    def _mark_as_mounted(self):
+        self._dom_newattr("rd", "1")
+        self.is_mounted = True
+        self.on_mount()
 
-    def on_style(self, value, instance):
-        if self.is_mounted:
-            self._mount_style()
-
+    def _dom_newattr(self, name, value):
+        self.elem.setAttribute(name, value)
 
     def on_mount(self):
         pass
     
     def on_unmount(self):
-        self.is_mounted = False
+        pass
 
     def render(self, before=None, after=None):
         return self.dom_renderer.render(self, before, after)
@@ -536,13 +430,17 @@ class Component(ObjectWithProperties):
 
         comp.render(before, after)
 
-    def _add_cid(self, comp, cid):
-        if cid is not None:
-            self.ids[cid] = comp
+    def add_html(self, html):
+        """Simplifies adding HTML elements to a component"""
+        tp = TemplateProcessor()
+        instructions = tp.parse("<HTMLComp>%s</HTMLComp>" % (html))
+        old_instructions = self.instructions
+        self.instructions = instructions
+        # Parse new instructions, this renders and appends new components to
+        # self
+        self.parse_instructions(self, instructions)
+        self.instructions = old_instructions
 
-    def get(self, cid):
-        """Gets component by its cid"""
-        return self.ids[cid]
 
     def remove(self, component):
         # unmount DOM first
@@ -562,7 +460,7 @@ class Component(ObjectWithProperties):
         RefMap.remove(component) #TODO removing comp from refmap will cause error in its binded events
 
     def remove_all(self):
-        torem = [c for c in self.children if c is not self._style_comp]
+        torem = [c for c in self.children]
         for c in torem:
             self.remove(c)
         self.ids = {}
@@ -573,18 +471,135 @@ class Component(ObjectWithProperties):
         del self.elem
         self.elem = None
         # TODO Unmount binds to DOM and from DOM
+        self.is_mounted = False
         self.on_unmount()
 
-    def add_html(self, html):
-        """Simplifies adding HTML elements to a component"""
-        tp = TemplateProcessor()
-        instructions = tp.parse("<HTMLComp>%s</HTMLComp>" % (html))
-        old_instructions = self.instructions
-        self.instructions = instructions
-        # Parse new instructions, this renders and appends new components to
-        # self
-        self.parse_instructions(self, instructions)
-        self.instructions = old_instructions
+
+class Component(BaseComponent):
+
+    """
+    Component class. All custom components inherit from it.
+    Every Component is linked with a  DOM ELement in the HTML
+    """
+    template = ""  # Template used to build the internals of the component
+    # Ids dict to quickly access child comps by their cid
+    # (comp.get('child_cid'))
+    ids = {}
+    _prop_list = []
+
+    style = Property("")
+    _rendered_style = Property("")
+    _style_comp = None
+
+    cls_initialized = False
+
+    def __init__(self, domnode=None):
+        super(Component, self).__init__(domnode)
+        self.ids = {}
+        # Bind on_property of instance for each prop
+        for propname in self._prop_list:
+            try:
+                callback = getattr(self, "on_%s" % (propname))
+                self.bind(propname, callback)
+            except:
+                pass
+
+        try:
+            callback = getattr(self, "on_style")
+            self.bind("style", callback) #bind will fail if self.style is not Property
+        except:
+            pass 
+
+    def mount(self):
+        """
+        Process the Component (and its children): Parses instructions, binds properties and renders the DOMNode in the site.
+        """
+        if self.elem is None: # Create DOM elem if needed
+            tag = self.tag if self.rendertag is None else self.rendertag
+            self.elem = self._create_domelem(tag)
+        self._dom_newattr("id", "%s_%s" % (self.__class__.__name__, self.iid))
+
+        self.set_context(self.root)
+
+        # Create style comp and add it
+        if len(self.style):
+            self._mount_style()
+
+        pprint("Mounting", self, "Instructions",
+               self.instructions, "Context: ", self.context)
+        self.parse_instructions()
+
+        # If this is root comp (no parent) then set props from DOM attributes
+        # Grab props from root domnode and use them to initialize component's
+        # props
+        if self.parent is None:
+            pprint("Parsing properties values from DOM to Component")
+            for attr in self.elem.attributes:
+                try:
+                    name, value = attr.name, attr.value
+                    if name not in ['cid', 'rd']:
+
+                        if match_search(value, REGEX_BRACKETS) != -1:
+                            setattr(self, name, eval(value[1:-1]))
+                        else:
+                            setattr(self, name, value)
+                except:
+                    pass
+        # mark as mounted
+        self._mark_as_mounted()
+        return self
+
+    def _mount_style(self):
+        self._rendered_style = self.style.replace(
+            ":host", "#%s" % (self.elem.id))
+        if self._style_comp is None:
+            self._style_comp = HTMLComp(tag='style')
+            self.add(self._style_comp)
+        self._style_comp.html = self._rendered_style
+
+
+    def on_style(self, value, instance):
+        if self.is_mounted:
+            self._mount_style()
+
+
+    def _add_cid(self, comp, cid):
+        if cid is not None:
+            self.ids[cid] = comp
+
+    def get(self, cid):
+        """Gets component by its cid"""
+        return self.ids[cid]
+
+    def remove_all(self):
+        torem = [c for c in self.children if c is not self._style_comp]
+        for c in torem:
+            self.remove(c)
+        self.ids = {}
+
+
+class HTMLComp(BaseComponent):
+
+    """Component for normal HTML nodes (<a>, <b>, <div>, <p>, etc.)"""
+    value = Property('')
+    html = Property(None)
+
+    def __init__(self, tag, domnode=None):
+        self.tag = tag
+        super(HTMLComp, self).__init__(domnode)
+
+        callback = getattr(self, "on_html")
+        self.bind("html", callback)
+
+    def on_html(self, value, instance):
+        self.elem.innerHTML = value
+
+    def mount(self):
+        self.set_context(self.root)
+        self.parse_instructions()
+        # mark as mounted
+        self._mark_as_mounted()
+        return self
 
     # Events Logic
     def domevent_callback(self, expression, context):
@@ -595,27 +610,6 @@ class Component(ObjectWithProperties):
         pprint("EVENT", event, "expression", expression)
         real_context = {'self': RefMap.get(context['self']),'parent': RefMap.get(context['parent']),'root':RefMap.get(context['root']),'this': RefMap.get(context['this'])}
         eval(expression, real_context)  # TODO security?
-
-
-class HTMLComp(Component):
-
-    """Component for normal HTML nodes (<a>, <b>, <div>, <p>, etc.)"""
-    value = Property('')
-
-    def __init__(self, tag, domnode=None):
-        self.tag = tag
-        super(HTMLComp, self).__init__(domnode)
-
-    def on_html(self, value, instance):
-        self.elem.innerHTML = value
-
-    def mount(self, context=None):
-        self.context = {"self": RefMap.add(self), "this": RefMap.add(self.elem), "root": RefMap.add(self.root), "parent": RefMap.add(self.parent)}
-        self.parse_instructions()
-        # mark as mounted
-        self._mark_as_mounted()
-        return self
-
 
 # From functools
 def partial(func, *args, **keywords):
