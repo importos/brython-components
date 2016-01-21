@@ -4,7 +4,7 @@ from components import Register, Component, Property
 from browser import timer
 
 class MyComponent(Component):
-    template = """<MyComponent>Seconds elapsed {self.time}</MyComponent>"""
+    template = """<MyComponent>Seconds elapsed {root.time}</MyComponent>"""
     time = Property(0)
 
     def on_mount(self):

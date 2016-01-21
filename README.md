@@ -16,7 +16,7 @@ from browser import alert
 class MyComponent(Component):
   template = """<MyComponent>
   <input cid='name' placeholder='Type your name' type='text'/>
-  <button onclick='{self.hello()}'>Click me</button>
+  <button onclick='{root.hello()}'>Click me</button>
   </MyComponent>"""
   
   def hello(self):

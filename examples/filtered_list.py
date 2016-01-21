@@ -7,9 +7,9 @@ from components import Register, Component, Property
 
 class FilteredList(Component):
     template = """<FilteredList>
-    <input cid='search' placeholder='Type search' onkeyup='{self.filter()}' type='text'/>
+    <input cid='search' placeholder='Type search' onkeyup='{root.filter()}' type='text'/>
     <ul cid='list'></ul>
-    <div>{self.itemslen} items</div>
+    <div>{root.itemslen} items</div>
     </FilteredList>"""
     items = Property([])
     initial_items = None
@@ -34,7 +34,7 @@ class FilteredList(Component):
             ulist.add(li)
 
 class ListItem(Component):
-    template = "<ListItem>{self.text}</ListItem>"
+    template = "<ListItem>{root.text}</ListItem>"
     rendertag = "li" # Use <li> instead of <ListItem> to render
     text = Property('')
 

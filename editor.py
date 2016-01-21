@@ -12,8 +12,8 @@ class ComponentEditor(Component):
                   <div class='panel'>
                       <div><h3>Brython</h3><CodeMirror cid='e1' mode='python'></CodeMirror></div>
                       <div><h3>HTML</h3><CodeMirror cid='e2'></CodeMirror>
-                      <button onclick="{self.render_code()}">Render</button>
-                      <button onclick="{self.share_code()}">Share</button>
+                      <button onclick="{root.render_code()}">Render</button>
+                      <button onclick="{root.share_code()}">Share</button>
                       <input type='text' cid='link' />
                       </div>
                   </div>
