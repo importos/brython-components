@@ -42,6 +42,34 @@ HTML_TAGS = ['A', 'ABBR', 'ACRONYM', 'ADDRESS', 'APPLET', 'AREA', 'B', 'BASE',
              # HTML5.1 tags
              'DETAILS', 'DIALOG', 'MENUITEM', 'PICTURE', 'SUMMARY']
 
+class RefMap(object):
+    """Holds references to all components"""
+    ref = {}
+    
+    @classmethod
+    def add(cls, obj):
+        id_ = id(obj)
+        if id_ in RefMap.ref and obj is not RefMap.ref[id_]:
+            print("WARNING Refmap already has object ", obj, "it'll be dereferenced because of", RefMap.ref[id_])
+
+        RefMap.ref[id_] = obj
+        return id_
+
+    @classmethod
+    def remove(cls, obj):
+        id_ = id(obj)
+        if id_ in RefMap.ref:
+            del RefMap.ref[id_]
+
+    @classmethod
+    def get_ref(cls, obj):
+        return id(obj)
+    
+    @classmethod
+    def get(cls, id_):
+        if id_ not in RefMap.ref:
+            raise Exception("RefMap does not contain id: ", id_)
+        return RefMap.ref[id_]
 
 class ObserverAlreadyRegistered(Exception):
     pass
@@ -150,6 +178,8 @@ class ObjectWithProperties(object):
         ObjectWithProperties.cnt += 1
         self._mro_idx = 1 
 
+        RefMap.add(self)
+
     def _calc_iid(self):
         # return hex(id(self) + self.cnt)
         return self.cnt
@@ -178,8 +208,11 @@ class ObjectWithProperties(object):
         If obj is None then obj=self
         """
         if obj is None:
-            obj = self
-        context_self = context['self']
+            obj = RefMap.get_ref(self)
+        else:
+            obj = RefMap.add(obj)
+
+        context_self = RefMap.get(context['self'])
         cbackp = self.chain_prop_cback(property_name, expression, context, obj)
 
         for prop in props2bind:
@@ -191,15 +224,15 @@ class ObjectWithProperties(object):
         # Call manually to set an initial value
         self._chain_prop(None, self, property_name, expression, context, obj)
 
-    def chain_prop_cback(self, propname, expression, context, obj=None):
+    def chain_prop_cback(self, propname, expression, context, objref=None):
         """returns a proper callback  that updates self.propname with evaluated expression, to be binded to a property.
         """
-        return partial(self._chain_prop, propname=propname, expression=expression, context=context, obj=obj)
+        return partial(self._chain_prop, propname=propname, expression=expression, context=context, objref=objref)
 
-    def _chain_prop(self, value, instance, propname, expression, context, obj):
+    def _chain_prop(self, value, instance, propname, expression, context, objref):
         # assign
-        v = expression(context['self'])
-        setattr(obj, propname, v)
+        v = expression(RefMap.get(context['self']))
+        setattr(RefMap.get(objref), propname, v)
 
     def force_change(self, propname):
         getattr(self.__class__, propname).force_change(self)
@@ -299,7 +332,7 @@ class Component(ObjectWithProperties):
         """
         Process the Component (and its children): Parses instructions, binds properties and renders the DOMNode in the site.
         """
-        if self.elem is None:
+        if self.elem is None: # Create DOM elem if needed
             tag = self.tag if self.rendertag is None else self.rendertag
             self.elem = self._create_domelem(tag)
         self._dom_newattr("id", "%s_%s" % (self.__class__.__name__, self.iid))
@@ -311,7 +344,7 @@ class Component(ObjectWithProperties):
         pprint("Mounting", self, "Instructions",
                self.instructions, "Context: ", context)
         self.context = {
-            "self": self, "root": self.root} if context is None else context
+            "self": RefMap.get_ref(self)} if context is None else context
         self.parse_instructions()
 
         # If this is root comp (no parent) then set props from DOM attributes
@@ -355,7 +388,7 @@ class Component(ObjectWithProperties):
     def parse_instructions(self):
         parentcomp = self
         instruction_set = self.instructions
-        context_self = self.context['self']
+        context_self = RefMap.get(self.context['self'])
 
         for instruction in instruction_set:
             type_ = instruction[0]
@@ -504,7 +537,8 @@ class Component(ObjectWithProperties):
                 break
         if comp_k is not None:
             del self.ids[comp_k]
-        #TODO unbind
+
+        RefMap.remove(component) #TODO removing comp from refmap will cause error in its binded events
 
     def remove_all(self):
         torem = [c for c in self.children if c is not self._style_comp]
@@ -514,6 +548,7 @@ class Component(ObjectWithProperties):
 
     def unmount(self):
         self.parent.elem.removeChild(self.elem)
+        RefMap.remove(self.elem)
         del self.elem
         self.elem = None
         # TODO Unmount binds to DOM and from DOM
@@ -537,7 +572,8 @@ class Component(ObjectWithProperties):
 
     def _domevent_callback(self, event, expression, context):
         pprint("EVENT", event, "expression", expression)
-        eval(expression, context)  # TODO security?
+        context_self = RefMap.get(context['self'])
+        eval(expression, {'self': context_self})  # TODO security?
 
 
 class HTMLComp(Component):
@@ -554,7 +590,7 @@ class HTMLComp(Component):
 
     def mount(self, context=None):
         self.context = {
-            "self": self, "root": self.root} if context is None else context
+            "self": RefMap.get_ref(self)} if context is None else context
         self.parse_instructions()
         # mark as mounted
         self._mark_as_mounted()
@@ -604,6 +640,7 @@ try:
     NEW_FUNC = JSConstructor(window.Function)
     REGEX_SELF = JSConstructor(window.RegExp)("self\.[A-Za-z0-9_]{1,}", 'g')
     REGEX_BRACKETS = JSConstructor(window.RegExp)("\{(.*?)\}", 'g')
+    window.RefMap = RefMap.ref
 
     def match(text, regex):
         jstext = JSConstructor(window.String)(text)
@@ -699,7 +736,7 @@ def render(event):
             except:
                 pass
             rootcomp = comp_cls(elem)
-            rootcomp.root = rootcomp
+            rootcomp.root =  rootcomp
             rootcomp.mount()
             # TODO What happens with root components? Are they garbage collected? Should we store a reference in a global variable?
 

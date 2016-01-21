@@ -1,5 +1,5 @@
 import tester as unittest
-from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor, BrowserDOMRender, Register, compile_expr
+from components import ObjectWithProperties, Property, HTMLComp, Component, TemplateProcessor, BrowserDOMRender, Register, compile_expr, RefMap
 from browser import document
 
 class ObjTest(ObjectWithProperties):
@@ -39,7 +39,7 @@ class TestProperties(unittest.TestCase):
         obj1 = ObjTest()
         obj2 = ObjTest()
         expr = 'self.a + self.b'
-        context = {'self': obj1}
+        context = {'self': RefMap.get_ref(obj1)}
         exprc = compile_expr(expr)
         obj2.update_with_expression('a', exprc, context, props2bind=('a', 'b'))
         obj1.a = 10
@@ -58,7 +58,6 @@ class TestProperties(unittest.TestCase):
         getattr(obj.__class__, 'a').force_change(obj)
 
         self.assertEqual(result[0], 1)
-
 
 class TestComponent(unittest.TestCase):
     tp = TemplateProcessor()
@@ -104,10 +103,10 @@ class TestComponent(unittest.TestCase):
         template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
-        li_comp = obj.children[2]
+        li_comp = obj.children[1]
 
-        self.assertEqual(len(obj.children), 3) # <style> , textnode, and <li>
-        self.assertEqual(obj.children[1].elem.text, "Text node")
+        self.assertEqual(len(obj.children), 2) #  textnode, and <li>
+        self.assertEqual(obj.children[0].elem.text, "Text node")
         self.assertEqual(li_comp.elem.nodeName, "LI")
         self.assertEqual(li_comp.elem.a, "1")
         self.assertEqual(li_comp.elem.b, "2")
@@ -116,7 +115,7 @@ class TestComponent(unittest.TestCase):
     def test_render(self):
         obj = MyComponent()
         template ="""<comp>Text node<li a='1' b='{self.b}'>{self.a}</li></comp>"""
-        expected = """<style rd="1"></style>Text node<li a="1" b="2" rd="1"><dynode>0</dynode></li>"""
+        expected = """Text node<li a="1" b="2" rd="1"><dynode>0</dynode></li>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
         self.assertEqual(obj.elem.html, expected)
@@ -127,17 +126,18 @@ class TestComponent(unittest.TestCase):
         obj.instructions = self.tp.parse(template)
         obj.mount()
         
-        dynode = obj.children[1]
+        dynode = obj.children[0]
         self.assertEqual(dynode.elem.html, "%s"%(obj.a)) # should be 0
         obj.a = 2
         self.assertEqual(dynode.elem.html, "%s"%(obj.a)) # should be 2
+
     def test_dom_attr_change(self):
         obj = MyComponent()
         template ="""<comp><li a='{self.a}'></li></comp>"""
         obj.instructions = self.tp.parse(template)
         obj.mount()
 
-        li_comp = obj.children[1]
+        li_comp = obj.children[0]
         self.assertEqual(li_comp.elem.a, "%s"%(obj.a)) # should be 0
         obj.a = 2
         self.assertEqual(li_comp.elem.a, "%s"%(obj.a)) # should be 2
