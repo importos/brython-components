@@ -168,15 +168,11 @@ class ObjectWithProperties(object):
 
     cnt = 0
     iid = None
-    _mro_idx = 1 # Position of ObjectWithProperties class in __mro__,
-                 # For Component _mro_idx = 2 TODO This can be problematic
-                 # if _mro_ changes with inheritance. Maybe _mro_idx can be calculated
 
     def __init__(self):
         self.cnt = ObjectWithProperties.cnt
         self.iid = self._calc_iid()
         ObjectWithProperties.cnt += 1
-        self._mro_idx = 1 
 
         RefMap.add(self)
 
@@ -305,7 +301,6 @@ class Component(ObjectWithProperties):
         super(Component, self).__init__()
         self.children = []
         self.ids = {}
-        self._mro_idx = 2
         # Bind on_property of instance for each prop
         for propname in self._prop_list:
             try:
