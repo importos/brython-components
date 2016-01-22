@@ -306,10 +306,13 @@ class BaseComponent(ObjectWithProperties):
                 attributes = instruction[2]
                 # Get cid if present
                 try:
-                    cid = [x[1] for x in attributes if x[0] == 'cid'][0]
+                    for x in attributes:
+                        if x[0] == 'cid':
+                            cid = x[1]
+                            break
                 except:
                     cid = None
-                if nodename not in HTML_TAGS and nodename != DYNODE:
+                if nodename in Register._reg_names: 
                     pprint("CREATE custom component, named", nodename)
                     try:
                         comp = Register.get_component_class(nodename)()
@@ -692,11 +695,13 @@ class Register(object):
 
     """Registers Components"""
     reg = []
+    _reg_names = []
 
     @classmethod
     def add(cls, comp_cls):
         if comp_cls not in cls.reg:
             cls.reg.append(comp_cls)
+            cls._reg_names.append(comp_cls.__name__.upper())
 
     @classmethod
     def get_component_class(cls, cls_name):
