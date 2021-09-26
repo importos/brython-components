@@ -652,26 +652,25 @@ def pprint(*args, **kwargs):
 DP = None
 try:
     from browser import document, alert, window, html, console
-    from javascript import JSConstructor
-    DP = JSConstructor(window.DOMParser)()
-    NEW_FUNC = JSConstructor(window.Function)
-    REGEX_SELF = JSConstructor(window.RegExp)("(self|parent|root)\.[A-Za-z0-9_]{1,}", 'g')
-    REGEX_BRACKETS = JSConstructor(window.RegExp)("\{(.*?)\}", 'g')
+    DP = window.DOMParser.new()
+    NEW_FUNC = window.Function.new
+    REGEX_SELF = window.RegExp.new("(self|parent|root)\.[A-Za-z0-9_]{1,}", 'g')
+    REGEX_BRACKETS = window.RegExp.new("\{(.*?)\}", 'g')
     window.RefMap = RefMap.ref
 
     def match(text, regex):
-        jstext = JSConstructor(window.String)(text)
+        jstext = window.String.new(text)
         m = jstext.match(regex)
         if m is None:
             return []
         return m
 
     def match_replace(text, regex, replace):
-        jstext = JSConstructor(window.String)(text)
+        jstext = window.String.ew(text)
         return jstext.replace(regex, replace)
 
     def match_search(text, regex):
-        jstext = JSConstructor(window.String)(text)
+        jstext = window.String.new(text)
         return jstext.search(regex)
 except:
     pprint("No brython and javascript libs.", force=True)
