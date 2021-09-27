@@ -773,7 +773,7 @@ class TemplateProcessor(object):
         self.instructions = []
         data = template.replace('{', '|{').replace('}', '}|')
         dom = self.dp.parseFromString(data, "text/xml")
-        rootnode = window.__BRYTHON__.DOMNode(dom).children[0]
+        rootnode = dom.childNodes[0]
         self.instructions = self.parse_children(rootnode)
         return self.instructions
 
@@ -781,7 +781,7 @@ class TemplateProcessor(object):
         pprint("Parsing template")
         pprint("ParentNode", parentnode)
         instructions = []
-        for node in parentnode.children:
+        for node in parentnode.childNodes:
             if node.nodeType == TEXT:
                 pprint("%sFound text node:[%s]" % ('--' * level, node.text))
 
