@@ -836,10 +836,10 @@ def get_props2bind(expression):
     return ret
 
 def compile_expr(expression):
-    thefunc = "def func(root, parent, self, this):\n    return %s" %(expression)
     try:
-        exec(thefunc)
+        def func(root, parent, self, this):
+            return eval(expression)
     except:
         raise Exception("Cannot compile expression %s"%(expression))
     else:
-        return func #Some IDEs will say func is not defined, but it is defined in exec in this scope
+        return func
